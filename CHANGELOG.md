@@ -8,4 +8,6 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.1.0]
 
-- First release.
+- First release: `thread_map` runs a typed function over an iterable on a bounded
+  thread pool, with ordered or completion-order results, worker caps, a progress
+  callback, and a choice between early stop and aggregated `ThreadMapError`.
