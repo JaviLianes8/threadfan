@@ -66,6 +66,9 @@ except ThreadMapError as error:
 
 `KeyboardInterrupt` and `SystemExit` are never collected: they stop the run at once.
 
+`ThreadMapError` pickles, subclasses included, as long as the exceptions and
+results it holds can be pickled themselves.
+
 ### Progress
 
 `on_progress(completed, total)` runs in the calling thread after each item,
@@ -94,15 +97,21 @@ for body in thread_imap(fetch, pages, workers=4):
 
 At most `max_pending` items (default twice `workers`) are submitted and not yet
 yielded at any time. An ordered stream waits for its oldest item before yielding
-later ones; pass `ordered=False` to get results as they complete. With
-`stop_on_error=False` failed items are skipped and a `ThreadMapError` is raised
-once the source is done.
+later ones; pass `ordered=False` to get results as they complete.
+
+Errors in an ordered stream behave like the builtin `map`: every result before
+the lowest failing index is yielded, then that failure is raised. If the source
+itself raises, the items already read from it are still processed and yielded
+before its exception. With `stop_on_error=False` failed items are skipped and a
+`ThreadMapError` is raised once the source is done. As in any generator, a
+`StopIteration` raised by `fn` reaches you as a `RuntimeError`; `thread_map`
+re-raises it unchanged.
 
 ### Options
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `workers` | 32, capped at the item count | Pool size. Must be an `int` of at least 1. |
+| `workers` | 32, capped at the item count | Pool size. An integer of at least 1. |
 | `ordered` | `True` | Input order, or completion order when false. |
 | `stop_on_error` | `True` | Re-raise the first failure, or collect them all. |
 | `max_pending` | `2 * workers` | Items submitted and not yet consumed at once. |
@@ -110,12 +119,14 @@ once the source is done.
 | `thread_name_prefix` | `"threadfan"` | Prefix for the worker thread names. |
 | `on_progress` | `None` | `thread_map` only: `(completed, total)` callback. |
 
-Options are checked before any item is read: a non-`int` count raises
-`TypeError`, a count below 1 raises `ValueError`, also for empty input.
+Options are checked before any item is read: a count that is not an integer
+(a `bool`, a `float`, a string) raises `TypeError`, a count below 1 raises
+`ValueError`, also for empty input.
 
 `copy_context=True` makes context variables set by the caller visible in the
-tasks, as `asyncio.to_thread` does. Each task gets its own copy, so changes made
-inside a task never leak back:
+tasks, as `asyncio.to_thread` does. The context is captured when `thread_map` or
+`thread_imap` is called, and each task gets its own copy, so changes made inside
+a task never leak back:
 
 ```python
 import contextvars

@@ -87,3 +87,18 @@ def test_stop_on_error_raises_one_of_the_real_failures(seed: int) -> None:
     with pytest.raises(ValueError) as info:
         thread_map(fn, items, workers=workers, max_pending=pending)
     assert str(info.value) in {f"item {item}" for item in failing}
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_ordered_stream_with_stop_on_error_matches_map_prefix(seed: int) -> None:
+    items, fn, failing, workers, pending = _case(seed)
+    first_bad = next((i for i, item in enumerate(items) if item in failing), len(items))
+    expected = list(map(fn, items[:first_bad]))
+    seen: list[int] = []
+    if not failing:
+        seen.extend(thread_imap(fn, items, workers=workers, max_pending=pending))
+    else:
+        with pytest.raises(ValueError) as info:
+            seen.extend(thread_imap(fn, items, workers=workers, max_pending=pending))
+        assert str(info.value) == f"item {items[first_bad]}"
+    assert seen == expected

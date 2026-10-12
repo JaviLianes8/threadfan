@@ -22,15 +22,18 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - `ThreadMapError.errors` is sorted by input index instead of completion order.
-- `workers` must be a real `int` (`TypeError` for `bool`, `float`, `str`) and is
-  checked before `items` is read, also for empty input.
+- `workers` must be an integer (`TypeError` for `bool`, `float`, `str`; integer-like
+  values such as numpy integers are accepted) and is checked before `items` is
+  read, also for empty input.
+- A `StopIteration` raised by `fn` or `on_progress` is re-raised unchanged.
 
 ### Fixed
 
 - A `KeyboardInterrupt` or `SystemExit` from a task, a failing `on_progress` or a
   failing source left every queued item running before the call returned. Every
   early exit now cancels queued items and waits only for running tasks.
-- `ThreadMapError` could not be pickled.
+- `ThreadMapError` could not be pickled. Subclasses and their extra attributes
+  now round-trip too.
 
 ## [0.1.0]
 

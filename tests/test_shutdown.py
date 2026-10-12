@@ -38,8 +38,9 @@ def test_first_failure_stops_submitting_beyond_the_window() -> None:
 def test_base_exceptions_from_tasks_propagate_even_when_collecting(error: BaseException) -> None:
     task = Recorder(0, error)
     with pytest.raises(type(error)):
-        thread_map(task, range(1_000), workers=2, stop_on_error=False)
-    assert task.calls <= 4
+        thread_map(task, range(1_000), workers=1, stop_on_error=False)
+    # The single worker may pick up one more item before the caller wakes up.
+    assert task.calls <= 2
 
 
 def test_a_failing_progress_callback_cancels_the_rest() -> None:

@@ -25,9 +25,19 @@ class ThreadMapError(Exception):
         self.results = dict(sorted((results or {}).items()))
         super().__init__(_describe(self.errors))
 
-    def __reduce__(self) -> tuple[type[ThreadMapError], tuple[Any, ...]]:
-        # The default pickling replays ``args`` (the message) into ``__init__``.
-        return (type(self), (self.errors, self.results))
+    def __reduce__(self) -> tuple[Any, ...]:
+        # The default pickling replays ``args`` (the message) into ``__init__``, and
+        # subclasses may take other arguments, so rebuild without calling theirs and
+        # restore the instance state (notes, extra attributes) afterwards.
+        return (_rebuild, (type(self), self.errors, self.results), self.__dict__)
+
+
+def _rebuild(
+    cls: type[ThreadMapError], errors: Mapping[int, Exception], results: Mapping[int, Any]
+) -> ThreadMapError:
+    error = cls.__new__(cls)
+    ThreadMapError.__init__(error, errors, results)
+    return error
 
 
 def _describe(errors: dict[int, Exception]) -> str:

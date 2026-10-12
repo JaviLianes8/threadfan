@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
+import operator
+from typing import SupportsIndex
+
 MAX_DEFAULT_WORKERS = 32
 """Default pool size cap, the same ceiling the standard library uses."""
 
 
 def check_count(name: str, value: object) -> int:
-    """Return ``value`` if it is a real ``int`` of at least 1, raise otherwise."""
+    """Return ``value`` as an ``int`` if it is an integer of at least 1, raise otherwise."""
     # bool is an int subclass, but ``workers=True`` is always a mistake.
-    if isinstance(value, bool) or not isinstance(value, int):
+    if isinstance(value, bool):
+        raise TypeError(f"{name} must be an int, got bool")
+    # Accept integer-like values too (numpy integers, anything with __index__).
+    if not isinstance(value, SupportsIndex):
         raise TypeError(f"{name} must be an int, got {type(value).__name__}")
-    if value < 1:
-        raise ValueError(f"{name} must be at least 1, got {value}")
-    return value
+    count = operator.index(value)
+    if count < 1:
+        raise ValueError(f"{name} must be at least 1, got {count}")
+    return count
 
 
 def resolve_workers(workers: int | None, total: int | None = None) -> int:

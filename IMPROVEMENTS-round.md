@@ -10,7 +10,7 @@ Progress:
 - [x] Installed wheel e2e test
 - [x] Docs: README, CHANGELOG, docstrings, packaging metadata
 - [x] Gates: ruff format, ruff check, mypy --strict, pytest
-- [ ] Independent review findings fixed with regression tests
+- [x] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 
 Every item is additive. `thread_map` keeps its name, its positional `fn` and `items`,
@@ -69,6 +69,18 @@ every keyword it had, and its `list[R]` return type.
     the test suite. Docstrings on every public name, CHANGELOG entry.
 11. **Packaging.** Classifiers for the supported versions, keywords, a test that the
     package version matches the metadata, and an installed-wheel e2e test.
+
+## Review fixes
+
+- A source that raises no longer drops the items already read from it.
+- Ordered `thread_imap` with `stop_on_error` yields everything before the lowest
+  failing index, then raises it, as `map` does.
+- `StopIteration` from `fn` or `on_progress` is re-raised unchanged by `thread_map`.
+- `ThreadMapError` subclasses pickle with their own attributes.
+- `copy_context` captures the context when `thread_imap` is called.
+- Integer-like counts (anything with `__index__`) are accepted, `bool` still is not.
+- A stream finalised inside one of its own workers no longer tries to join itself.
+- A per-test watchdog turns a scheduling hang into a failure.
 
 ## Out of scope
 

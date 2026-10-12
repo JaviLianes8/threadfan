@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 from collections.abc import Callable, Generator, Iterable
 from typing import TypeVar
 
@@ -43,7 +44,7 @@ def thread_map(
     and ``max_pending`` caps the items submitted at once (default twice the pool).
     ``on_progress(completed, total)`` runs in the calling thread after each item,
     failures included. ``copy_context`` runs each task in a copy of the caller's
-    :mod:`contextvars` context. Worker threads are named after
+    :mod:`contextvars` context, taken when this is called. Worker threads are named after
     ``thread_name_prefix``.
     """
     run = _make_run(
@@ -57,6 +58,8 @@ def thread_map(
     run.on_progress = on_progress
     run.total = len(work)
     pairs = list(run.stream(work))
+    if run.failure is not None:
+        raise run.failure
     if run.errors:
         raise ThreadMapError(run.errors, dict(pairs)) from _first(run.errors)
     if ordered:
@@ -84,9 +87,16 @@ def thread_imap(
     order. The options are validated when this is called, before any item is read.
 
     Closing the generator, or leaving a ``for`` loop over it once it is released,
-    cancels queued work and waits only for the tasks already running. Errors
-    behave as in :func:`thread_map`; with ``stop_on_error=False`` the failed items
-    are skipped and a :class:`ThreadMapError` is raised once the source is done.
+    cancels queued work and waits only for the tasks already running.
+
+    With ``stop_on_error`` an ordered stream behaves like ``map``: it yields every
+    result before the lowest failing index, then raises that failure. In
+    completion order the first failure to complete is raised. With
+    ``stop_on_error=False`` failed items are skipped and a :class:`ThreadMapError`
+    is raised once the source is done. If ``items`` itself raises, the items read
+    before it are still processed and yielded, then its exception is raised. As
+    in any generator, a ``StopIteration`` from ``fn`` surfaces as ``RuntimeError``.
+    ``copy_context`` captures the caller's context when this is called.
     """
     run = _make_run(
         fn, workers, max_pending, ordered, stop_on_error, copy_context, thread_name_prefix
@@ -97,6 +107,8 @@ def thread_imap(
 def _stream(run: Run[T, R], items: Iterable[T]) -> Generator[R, None, None]:
     for _, value in run.stream(items):
         yield value
+    if run.failure is not None:
+        raise run.failure
     if run.errors:
         raise ThreadMapError(run.errors) from _first(run.errors)
 
@@ -117,7 +129,7 @@ def _make_run(
         window=resolve_window(max_pending, size),
         ordered=ordered,
         stop_on_error=stop_on_error,
-        copy_context=copy_context,
+        context=contextvars.copy_context() if copy_context else None,
         thread_name_prefix=check_prefix(thread_name_prefix),
     )
 
