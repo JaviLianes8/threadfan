@@ -1,30 +1,19 @@
-"""The bounded, typed parallel map and its error type."""
+"""The public entry points: ``thread_map`` (a list) and ``thread_imap`` (a stream)."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+import contextvars
+from collections.abc import Callable, Generator, Iterable
 from typing import TypeVar
+
+from ._engine import ProgressCallback, Run
+from ._errors import ThreadMapError
+from ._options import check_prefix, resolve_window, resolve_workers
 
 T = TypeVar("T")
 R = TypeVar("R")
 
-ProgressCallback = Callable[[int, int], None]
-
-_MAX_DEFAULT_WORKERS = 32
-
-
-class ThreadMapError(Exception):
-    """Raised when ``stop_on_error`` is off and one or more tasks failed.
-
-    The per item failures are kept in :attr:`errors`, keyed by input index.
-    """
-
-    def __init__(self, errors: dict[int, Exception]) -> None:
-        self.errors = errors
-        count = len(errors)
-        noun = "task" if count == 1 else "tasks"
-        super().__init__(f"{count} {noun} failed")
+DEFAULT_PREFIX = "threadfan"
 
 
 def thread_map(
@@ -35,60 +24,115 @@ def thread_map(
     ordered: bool = True,
     stop_on_error: bool = True,
     on_progress: ProgressCallback | None = None,
+    max_pending: int | None = None,
+    copy_context: bool = False,
+    thread_name_prefix: str = DEFAULT_PREFIX,
 ) -> list[R]:
     """Apply ``fn`` to every item across a bounded pool of worker threads.
 
     Results follow the input order when ``ordered`` is true, otherwise they
-    arrive in completion order. With ``stop_on_error`` the first failure is
-    re-raised and pending work is cancelled; without it every item runs and a
-    :class:`ThreadMapError` is raised at the end if any failed. ``on_progress``
-    is called with ``(completed, total)`` after each item finishes.
+    arrive in completion order. ``items`` is read in full first so the total is
+    known; use :func:`thread_imap` for sources too large to hold in memory.
+
+    With ``stop_on_error`` the first failure (in completion order) is re-raised
+    unchanged, queued items are cancelled and the call returns once the tasks
+    already running finish. Without it every item runs and a
+    :class:`ThreadMapError` holding the failures and the successful results is
+    raised at the end if any failed.
+
+    ``workers`` caps the pool (default 32, never more than the number of items)
+    and ``max_pending`` caps the items submitted at once (default twice the pool).
+    ``on_progress(completed, total)`` runs in the calling thread after each item,
+    failures included. ``copy_context`` runs each task in a copy of the caller's
+    :mod:`contextvars` context, taken when this is called. Worker threads are named after
+    ``thread_name_prefix``.
     """
+    run = _make_run(
+        fn, workers, max_pending, False, stop_on_error, copy_context, thread_name_prefix
+    )
     work = list(items)
-    total = len(work)
-    if total == 0:
+    if not work:
         return []
-
-    pool_size = _bounded_workers(workers, total)
-    ordered_results: dict[int, R] = {}
-    unordered_results: list[R] = []
-    errors: dict[int, Exception] = {}
-    completed = 0
-
-    with ThreadPoolExecutor(max_workers=pool_size) as pool:
-        futures: dict[Future[R], int] = {
-            pool.submit(fn, item): index for index, item in enumerate(work)
-        }
-        for future in as_completed(futures):
-            index = futures[future]
-            try:
-                value = future.result()
-            except Exception as error:
-                if stop_on_error:
-                    for pending in futures:
-                        pending.cancel()
-                    raise
-                errors[index] = error
-            else:
-                if ordered:
-                    ordered_results[index] = value
-                else:
-                    unordered_results.append(value)
-            completed += 1
-            if on_progress is not None:
-                on_progress(completed, total)
-
-    if errors:
-        raise ThreadMapError(errors)
+    run.workers = resolve_workers(workers, len(work))
+    run.window = resolve_window(max_pending, run.workers)
+    run.on_progress = on_progress
+    run.total = len(work)
+    pairs = list(run.stream(work))
+    if run.failure is not None:
+        raise run.failure
+    if run.errors:
+        raise ThreadMapError(run.errors, dict(pairs)) from _first(run.errors)
     if ordered:
-        return [ordered_results[index] for index in range(total)]
-    return unordered_results
+        pairs.sort(key=lambda pair: pair[0])
+    return [value for _, value in pairs]
 
 
-def _bounded_workers(workers: int | None, total: int) -> int:
-    """Clamp the pool size to a sane bound, never more than the item count."""
-    if workers is None:
-        return min(_MAX_DEFAULT_WORKERS, total)
-    if workers < 1:
-        raise ValueError("workers must be at least 1")
-    return min(workers, total)
+def thread_imap(
+    fn: Callable[[T], R],
+    items: Iterable[T],
+    *,
+    workers: int | None = None,
+    ordered: bool = True,
+    stop_on_error: bool = True,
+    max_pending: int | None = None,
+    copy_context: bool = False,
+    thread_name_prefix: str = DEFAULT_PREFIX,
+) -> Generator[R, None, None]:
+    """Lazily apply ``fn`` to ``items`` on a bounded pool, yielding results as a stream.
+
+    ``items`` is read only as fast as results are consumed: at most
+    ``max_pending`` items (default twice ``workers``) are submitted and not yet
+    yielded at any time, so endless sources work. Ordered streams wait for the
+    oldest item before yielding later ones; ``ordered=False`` yields in completion
+    order. The options are validated when this is called, before any item is read.
+
+    Closing the generator, or leaving a ``for`` loop over it once it is released,
+    cancels queued work and waits only for the tasks already running.
+
+    With ``stop_on_error`` an ordered stream behaves like ``map``: it yields every
+    result before the lowest failing index, then raises that failure. In
+    completion order the first failure to complete is raised. With
+    ``stop_on_error=False`` failed items are skipped and a :class:`ThreadMapError`
+    is raised once the source is done. If ``items`` itself raises, the items read
+    before it are still processed and yielded, then its exception is raised. As
+    in any generator, a ``StopIteration`` from ``fn`` surfaces as ``RuntimeError``.
+    ``copy_context`` captures the caller's context when this is called.
+    """
+    run = _make_run(
+        fn, workers, max_pending, ordered, stop_on_error, copy_context, thread_name_prefix
+    )
+    return _stream(run, items)
+
+
+def _stream(run: Run[T, R], items: Iterable[T]) -> Generator[R, None, None]:
+    for _, value in run.stream(items):
+        yield value
+    if run.failure is not None:
+        raise run.failure
+    if run.errors:
+        raise ThreadMapError(run.errors) from _first(run.errors)
+
+
+def _make_run(
+    fn: Callable[[T], R],
+    workers: int | None,
+    max_pending: int | None,
+    ordered: bool,
+    stop_on_error: bool,
+    copy_context: bool,
+    thread_name_prefix: str,
+) -> Run[T, R]:
+    size = resolve_workers(workers)
+    return Run(
+        fn=fn,
+        workers=size,
+        window=resolve_window(max_pending, size),
+        ordered=ordered,
+        stop_on_error=stop_on_error,
+        context=contextvars.copy_context() if copy_context else None,
+        thread_name_prefix=check_prefix(thread_name_prefix),
+    )
+
+
+def _first(errors: dict[int, Exception]) -> Exception:
+    return errors[min(errors)]

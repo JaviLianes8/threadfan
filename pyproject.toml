@@ -4,18 +4,26 @@ build-backend = "hatchling.build"
 
 [project]
 name = "threadfan"
-version = "0.1.0"
+version = "0.2.0"
 description = "Typed, ordered parallel map over a bounded thread pool for IO-bound fan-out"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Javier Lianes", email = "javier@lianes8studio.com" }]
-keywords = []
+keywords = ["threads", "thread pool", "parallel map", "concurrency", "fan-out", "typed"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
     "Typing :: Typed",
 ]
 dependencies = []
