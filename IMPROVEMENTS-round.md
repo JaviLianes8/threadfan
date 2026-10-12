@@ -2,14 +2,14 @@
 
 Progress:
 - [x] Brainstorm ranked improvements (this file)
-- [ ] Engine: bounded submission window, clean shutdown on every exit path
-- [ ] `thread_imap`: lazy, ordered or completion-order streaming with backpressure
-- [ ] Errors: deterministic `ThreadMapError` (sorted errors, partial results, picklable)
-- [ ] Options: strict `workers` validation, `max_pending`, `copy_context`, `thread_name_prefix`
-- [ ] Contracts: oracle against builtin `map`, laziness, shutdown, typing, README examples
-- [ ] Installed wheel e2e test
-- [ ] Docs: README, CHANGELOG, docstrings, packaging metadata
-- [ ] Gates: ruff format, ruff check, mypy --strict, pytest
+- [x] Engine: bounded submission window, clean shutdown on every exit path
+- [x] `thread_imap`: lazy, ordered or completion-order streaming with backpressure
+- [x] Errors: deterministic `ThreadMapError` (sorted errors, partial results, picklable)
+- [x] Options: strict `workers` validation, `max_pending`, `copy_context`, `thread_name_prefix`
+- [x] Contracts: oracle against builtin `map`, laziness, shutdown, typing, README examples
+- [x] Installed wheel e2e test
+- [x] Docs: README, CHANGELOG, docstrings, packaging metadata
+- [x] Gates: ruff format, ruff check, mypy --strict, pytest
 - [ ] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 
