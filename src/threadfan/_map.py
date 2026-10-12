@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Generator, Iterable
 from typing import TypeVar
 
 from ._engine import ProgressCallback, Run
@@ -74,7 +74,7 @@ def thread_imap(
     max_pending: int | None = None,
     copy_context: bool = False,
     thread_name_prefix: str = DEFAULT_PREFIX,
-) -> Iterator[R]:
+) -> Generator[R, None, None]:
     """Lazily apply ``fn`` to ``items`` on a bounded pool, yielding results as a stream.
 
     ``items`` is read only as fast as results are consumed: at most
@@ -94,7 +94,7 @@ def thread_imap(
     return _stream(run, items)
 
 
-def _stream(run: Run[T, R], items: Iterable[T]) -> Iterator[R]:
+def _stream(run: Run[T, R], items: Iterable[T]) -> Generator[R, None, None]:
     for _, value in run.stream(items):
         yield value
     if run.errors:
