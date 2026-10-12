@@ -79,3 +79,21 @@ def test_the_pool_threads_are_gone_after_any_exit() -> None:
         with pytest.raises(Exception):  # noqa: B017
             run()
         assert [t for t in threading.enumerate() if t.name.startswith("gone-a")] == []
+
+
+def test_items_already_queued_inside_the_window_are_cancelled() -> None:
+    started = threading.Event()
+    calls: list[int] = []
+
+    def work(value: int) -> int:
+        calls.append(value)
+        if value == 0:
+            started.set()
+            raise RuntimeError("first")
+        return value
+
+    with pytest.raises(RuntimeError, match="first"):
+        thread_map(work, range(10), workers=1, max_pending=10)
+    assert started.is_set()
+    # The single worker may pick up one more item before the caller wakes up.
+    assert len(calls) <= 2
