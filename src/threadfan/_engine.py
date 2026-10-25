@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import contextvars
+import queue
 import threading
-from collections.abc import Callable, Iterable, Iterator
-from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from collections.abc import Callable, Iterator
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
+from ._progress import ProgressCallback
+
 T = TypeVar("T")
 R = TypeVar("R")
-
-ProgressCallback = Callable[[int, int], None]
-"""Called as ``on_progress(completed, total)`` in the calling thread after each item."""
 
 
 @dataclass
@@ -31,23 +31,28 @@ class Run(Generic[T, R]):
     ordered: bool
     stop_on_error: bool
     thread_name_prefix: str
+    # Streams count the results waiting to be yielded against ``window``;
+    # ``thread_map`` keeps every result anyway, so only tasks in flight count.
+    hold_unyielded: bool = True
     context: contextvars.Context | None = None
     on_progress: ProgressCallback | None = None
     total: int = 0
     errors: dict[int, Exception] = field(default_factory=dict)
     failure: BaseException | None = None
 
-    def stream(self, items: Iterable[T]) -> Iterator[tuple[int, R]]:
+    def stream(self, source: Iterator[T]) -> Iterator[tuple[int, R]]:
         """Yield ``(index, value)`` for each success, in input or completion order.
 
-        At most ``window`` items are read from ``items`` and not yet yielded at any
-        moment. Whatever ends the stream early cancels queued work and waits only
-        for the tasks already running. An ordered stream with ``stop_on_error``
-        yields every result before the first failing index, as ``map`` does, and
-        a source that raises still has the items read before it processed.
+        The window caps the items read from ``source`` and not yet yielded (or, for
+        ``thread_map``, the tasks in flight). Whatever ends the stream early cancels
+        queued work and waits only for the tasks already running. In input order a
+        failure stops the run once every lower index has finished, so the failure
+        raised is the one with the lowest index, as with ``map``; a source that
+        raises still has the items read before it processed.
         """
-        source = iter(items)
         pool = ThreadPoolExecutor(self.workers, thread_name_prefix=self.thread_name_prefix)
+        # Done callbacks feed this queue: waiting costs the same whatever the window.
+        finished: queue.SimpleQueue[Future[R]] = queue.SimpleQueue()
         pending: dict[Future[R], int] = {}
         ready: dict[int, R] = {}
         submitted = emitted = completed = 0
@@ -66,20 +71,25 @@ class Run(Generic[T, R]):
                     except Exception as broken:
                         source_error, exhausted = broken, True
                         break
-                    pending[self._submit(pool, item)] = submitted
+                    future = self._submit(pool, item)
+                    pending[future] = submitted
+                    future.add_done_callback(finished.put)
                     submitted += 1
                 if not pending:
                     self.failure = source_error
                     return
-                done, _ = wait(pending, return_when=FIRST_COMPLETED)
-                for future in sorted(done, key=pending.__getitem__):
+                for future in _settled(finished, pending):
                     index = pending.pop(future)
+                    if future.cancelled():
+                        continue
                     error = future.exception()
                     if error is None:
                         pass
                     elif isinstance(error, Exception) and not self.stop_on_error:
                         self.errors[index] = error
                     elif isinstance(error, Exception) and self.ordered:
+                        if stop_at is None:
+                            _cancel_after(index, pending)
                         if stop_at is None or index < stop_at:
                             stop_at, stop_error = index, error
                         continue
@@ -104,12 +114,12 @@ class Run(Generic[T, R]):
                     self.failure = stop_error
                     return
         finally:
-            # A stream collected inside one of its own workers must not join itself.
+            # A stream closed inside one of its own workers must not join itself.
             inside = threading.current_thread() in getattr(pool, "_threads", ())
             pool.shutdown(wait=not inside, cancel_futures=True)
 
     def _room(self, submitted: int, emitted: int, pending: dict[Future[R], int]) -> bool:
-        if self.ordered:
+        if self.ordered and self.hold_unyielded:
             return submitted - emitted < self.window
         return len(pending) < self.window
 
@@ -129,3 +139,22 @@ class Run(Generic[T, R]):
             self.failure = error
             return False
         return True
+
+
+def _settled(
+    finished: queue.SimpleQueue[Future[R]], pending: dict[Future[R], int]
+) -> list[Future[R]]:
+    """Wait for one task to settle, take every other settled one, sort by input index."""
+    batch = [finished.get()]
+    while True:
+        try:
+            batch.append(finished.get_nowait())
+        except queue.Empty:
+            return sorted(batch, key=pending.__getitem__)
+
+
+def _cancel_after(index: int, pending: dict[Future[R], int]) -> None:
+    """Cancel the queued tasks past ``index``: once it failed, their results cannot matter."""
+    for future, position in pending.items():
+        if position > index:
+            future.cancel()

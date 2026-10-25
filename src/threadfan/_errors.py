@@ -2,42 +2,69 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import copyreg
+from collections.abc import Callable, Mapping
 from typing import Any
+
+from ._options import show_int, type_name
+
+_DETAIL_LIMIT = 200
+# The constructor that pickle protocol 2 and later name NEWOBJ; typeshed does not declare it.
+_NEWOBJ: Callable[..., object] = vars(copyreg)["__newobj__"]
 
 
 class ThreadMapError(Exception):
     """Raised at the end of a run with ``stop_on_error=False`` when any task failed.
 
-    :attr:`errors` maps each failing input index to its exception and :attr:`results`
-    maps each successful input index to its value. Both are sorted by index. For
-    :func:`thread_imap` the successful values were already yielded, so
-    :attr:`results` is empty.
-    """
+    :attr:`errors` maps the input index of each failed item to its exception and
+    :attr:`results` the index of each successful item to the value ``fn`` returned
+    (typed ``Any``, since an ``except`` clause cannot carry the result type). Both are
+    sorted by index. :func:`thread_imap` has already yielded its values, so its
+    :attr:`results` is empty. The failure with the lowest index is the ``__cause__``.
 
-    errors: dict[int, Exception]
-    results: dict[int, Any]
+    The message gives the number of failures and the first one, cut to 200 characters
+    of ``Type: message``. Building one by hand takes any mapping from ``int`` indices
+    to exceptions (and to results); anything else raises ``TypeError``. It pickles,
+    subclasses and their attributes included, when its contents pickle.
+
+    >>> from threadfan import ThreadMapError, thread_map
+    >>> try:
+    ...     thread_map(int, ["1", "x", "3", "y"], stop_on_error=False)
+    ... except ThreadMapError as error:
+    ...     print(error)
+    ...     print(error.results, list(error.errors))
+    2 tasks failed; first at index 1: ValueError: invalid literal for int() with base 10: 'x'
+    {0: 1, 2: 3} [1, 3]
+    """
 
     def __init__(
         self, errors: Mapping[int, Exception], results: Mapping[int, Any] | None = None
     ) -> None:
-        self.errors = dict(sorted(errors.items()))
-        self.results = dict(sorted((results or {}).items()))
+        # Annotated here, not on the class: the class lives at the package top, where a
+        # class-level ``Any`` would not resolve for ``typing.get_type_hints``.
+        self.errors: dict[int, Exception] = _by_index("errors", errors, failures=True)
+        self.results: dict[int, Any] = (
+            {} if results is None else _by_index("results", results, failures=False)
+        )
         super().__init__(_describe(self.errors))
 
     def __reduce__(self) -> tuple[Any, ...]:
-        # The default pickling replays ``args`` (the message) into ``__init__``, and
-        # subclasses may take other arguments, so rebuild without calling theirs and
-        # restore the instance state (notes, extra attributes) afterwards.
-        return (_rebuild, (type(self), self.errors, self.results), self.__dict__)
+        # Rebuild without calling ``__init__`` (a subclass may take other arguments) and
+        # restore the state (notes, extra attributes) afterwards. The pickle names only
+        # ``copyreg`` and the class, never the private module that defines it.
+        return (_NEWOBJ, (type(self), *self.args), self.__dict__)
 
 
-def _rebuild(
-    cls: type[ThreadMapError], errors: Mapping[int, Exception], results: Mapping[int, Any]
-) -> ThreadMapError:
-    error = cls.__new__(cls)
-    ThreadMapError.__init__(error, errors, results)
-    return error
+def _by_index(name: str, mapping: object, *, failures: bool) -> dict[int, Any]:
+    if not isinstance(mapping, Mapping):
+        raise TypeError(f"{name} must be a mapping, got {type_name(mapping)}")
+    pairs = list(mapping.items())
+    for index, value in pairs:
+        if isinstance(index, bool) or not isinstance(index, int):
+            raise TypeError(f"{name} keys must be int indices, got {type_name(index)}")
+        if failures and not isinstance(value, Exception):
+            raise TypeError(f"{name} values must be exceptions, got {type_name(value)}")
+    return dict(sorted(pairs, key=lambda pair: pair[0]))
 
 
 def _describe(errors: dict[int, Exception]) -> str:
@@ -46,5 +73,16 @@ def _describe(errors: dict[int, Exception]) -> str:
     if not errors:
         return f"{count} {noun} failed"
     index, error = next(iter(errors.items()))
-    detail = f"{type(error).__name__}: {error}" if str(error) else type(error).__name__
-    return f"{count} {noun} failed; first at index {index}: {detail}"
+    return f"{count} {noun} failed; first at index {show_int(index)}: {_summary(error)}"
+
+
+def _summary(error: Exception) -> str:
+    try:
+        text = str(error)
+    except Exception:
+        # A broken ``__str__`` must not replace the error that carries every result.
+        text = "<message could not be read>"
+    detail = f"{type_name(error)}: {text}" if text else type_name(error)
+    if len(detail) <= _DETAIL_LIMIT:
+        return detail
+    return detail[: _DETAIL_LIMIT - 3] + "..."

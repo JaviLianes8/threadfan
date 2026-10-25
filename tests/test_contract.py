@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib.resources
 
 import threadfan
@@ -14,6 +16,11 @@ PUBLIC_API: list[str] = [
 
 def test_all_lists_exactly_the_public_api() -> None:
     assert sorted(threadfan.__all__) == sorted(PUBLIC_API)
+
+
+def test_nothing_else_is_public_at_the_package_top() -> None:
+    public = [name for name in dir(threadfan) if not name.startswith("_")]
+    assert sorted(public) == sorted(PUBLIC_API)
 
 
 def test_every_exported_name_resolves() -> None:
