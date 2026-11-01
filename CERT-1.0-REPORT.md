@@ -12,11 +12,17 @@ Progress:
 - [x] QA round 2 fixes for C-03 and E-08, with regression and mutation evidence.
 - [x] QA round 3 fix for E-09, with regression and mutation evidence.
 - [x] Independent review round 1 fixes for CERT-05 and CERT-06.
-- [ ] Independent reviewer (item 16).
-- [ ] Merge and publication (item 17).
-- [ ] Five independent QA lenses (item 19).
+- [x] Independent reviewer: PASS in round 2 (item 16).
+- [x] Release handoff prepared (item 17); merge and publication reserved to the release owner.
+- [x] Five independent QA lenses: all PASS (item 19).
 
-## Scorecard
+## Final scorecard
+
+The independent review in round 2 passes all 18 reviewable items at
+`72435cf941bfa19ad1856bc66647b995ed17759f`, with no outstanding findings.
+Items 1-16, 18 and 19 below record that reviewer's scores. Item 17 records only
+the requested pre-merge preparation; the reviewer reserved merge and publication
+to the release owner. Neither operation is claimed as complete.
 
 | Item | Verdict | Evidence |
 | --- | --- | --- |
@@ -35,10 +41,35 @@ Progress:
 | 13. Metadata | PASS | 1.0.0, Production/Stable, Python >=3.10, 3.10-3.14 classifiers, MIT, project URLs, keywords, no runtime dependencies. |
 | 14. Archives | PASS | Wheel and sdist inspected; LICENSE and typing marker included; no fetched documents, caches or working notes. |
 | 15. Gates | PASS | Format, lint, strict source typing and pytest exit 0; source and tests also pass strict typing together. |
-| 16. Independent reviewer | PENDING | Round 1 findings CERT-05 and CERT-06 are fixed below; independent re-review remains pending. |
-| 17. Release | PREPARED | PR #3, branch `release/1.0.0`; merge and publication pending. |
+| 16. Independent reviewer | PASS | Round 2 at `72435cf941bfa19ad1856bc66647b995ed17759f` confirms CERT-05 and CERT-06 fixed, all 18 reviewable items passing and no findings. |
+| 17. Pre-merge release preparation | PASS | Open PR #3 from `release/1.0.0` to `main`, titled `threadfan 1.0.0`; merge and publication remain reserved to the release owner. |
 | 18. Mutation round | PASS | Original 23/23 variants caught; all seven round 1 survivors, round 2 N21, round 3 M05 and six independent-review regression mutations caught. |
-| 19. QA lenses | PENDING | e reported FAIL in round 3; E-09 fixed below, awaiting independent re-review. Earlier lens verdicts are unchanged. |
+| 19. QA lenses | PASS | All five final lens verdicts are PASS: a/b/d in round 1, c in round 3 and e in round 4. The final reviewer verified their reports, execution witnesses and commit ancestry. |
+
+## Final QA and review evidence
+
+Report paths are relative to this repository checkout. Each verdict applies to
+the exact commit shown; the final review additionally verifies the later fixes.
+The historical sections below retain the findings and evidence from each round.
+
+| Lens | Rounds | Final verdict | Report path | Commit |
+| --- | ---: | --- | --- | --- |
+| a: API and documentation | 1 | PASS | `../../scratch/threadfan-cert/lens-a-r1/REPORT.md` | `b7d3cfecdf9e54c1832458df4ac6d9e78d46ecdc` |
+| b: Correctness and ground truth | 1 | PASS | `../../scratch/threadfan-cert/lens-b-r1/REPORT.md` | `b7d3cfecdf9e54c1832458df4ac6d9e78d46ecdc` |
+| c: Adversarial and robustness | 3 | PASS | `../../scratch/threadfan-cert/lens-c-r3/REPORT.md` | `9c55f7fae2bc00cd61181a3a265bade5a8fca6d9` |
+| d: Packaging and real e2e | 1 | PASS | `../../scratch/threadfan-cert/lens-d-r1/REPORT.md` | `b7d3cfecdf9e54c1832458df4ac6d9e78d46ecdc` |
+| e: Contract strength | 4 | PASS | `../../scratch/threadfan-cert/lens-e-r4/REPORT.md` | `53f7b2b0853fbf26498589fb726e79dc1fd10772` |
+
+| Review | Rounds | Final verdict | Report path | Commit |
+| --- | ---: | --- | --- | --- |
+| Independent certification review | 2 | PASS | `../../scratch/threadfan-cert/review-r2/REPORT.md` | `72435cf941bfa19ad1856bc66647b995ed17759f` |
+
+The final reviewer reran the full suite (**486 passed, no skips**), all four gates,
+strict source-and-test typing, installed-wheel consumers and the real PyPI 0.2.0
+upgrade. All seven available supported interpreter builds passed. The original
+17 reproduction cases and 69 new contracts passed against source and the installed
+wheel. Ten independent single mutations each caused behavioral test failures;
+the unmodified code passed before and after. CERT-05, CERT-06 and E-09 are closed.
 
 ## API and compatibility
 
