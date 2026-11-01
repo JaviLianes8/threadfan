@@ -89,6 +89,11 @@ def _run(*cmd: str | Path, cwd: Path | None = None) -> subprocess.CompletedProce
     )
 
 
+def _consumer(python: Path, work: Path, version: str) -> subprocess.CompletedProcess[str]:
+    program = PROGRAM + f"\nassert threadfan.__version__ == {version!r}\n"
+    return _run(python, "-I", "-c", program, cwd=work)
+
+
 def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
     dist = tmp_path / "dist"
     built = _run(sys.executable, "-m", "build", "--outdir", dist, ROOT)
@@ -125,14 +130,14 @@ def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
     # Run from an empty folder so the source tree cannot shadow the install.
     work = tmp_path / "work"
     work.mkdir()
-    result = _run(python, "-I", "-c", PROGRAM, cwd=work)
+    result = _consumer(python, work, "1.0.0")
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "e2e ok"
 
     if os.environ.get("THREADFAN_E2E_PYPI") == "1":
         installed = _run(python, "-m", "pip", "install", "--no-deps", "threadfan==0.2.0")
         assert installed.returncode == 0, installed.stderr
-        old = _run(python, "-I", "-c", PROGRAM, cwd=work)
+        old = _consumer(python, work, "0.2.0")
         assert old.returncode == 0, old.stderr
         saved = _run(python, "-I", "-c", PICKLE_PROGRAM, work, "write", cwd=work)
         assert saved.returncode == 0, saved.stderr
@@ -140,7 +145,7 @@ def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
         assert installed.returncode == 0, installed.stderr
         loaded = _run(python, "-I", "-c", PICKLE_PROGRAM, work, "read", cwd=work)
         assert loaded.returncode == 0, loaded.stderr
-        result = _run(python, "-I", "-c", PROGRAM, cwd=work)
+        result = _consumer(python, work, "1.0.0")
         assert result.returncode == 0, result.stderr
         saved = _run(python, "-I", "-c", PICKLE_PROGRAM, work, "write", cwd=work)
         assert saved.returncode == 0, saved.stderr

@@ -1,61 +1,168 @@
 # threadfan 1.0.0 certification report
 
 Progress:
-- [x] Resume release branch and preserve its existing commit.
-- [x] Fetch current PyPI metadata: 0.2.0 is published.
-- [x] Review stable API, typing, errors and runnable documentation.
-- [x] Add contracts for completion order, progress and single option evaluation.
-- [x] Fetch and execute reference examples and independent comparisons.
-- [ ] Build, inspect and install distributions, including a 0.2.0 upgrade.
-- [ ] Run every available supported interpreter.
-- [ ] Complete the mutation round and record the table.
-- [ ] Run the final four gates and prepare the release PR.
-- [ ] Independent review (item 16), merge and publication (item 17).
+- [x] Resume and preserve the existing release branch commit.
+- [x] Stable API, typed errors, runnable docs and complete contracts (items 1-6).
+- [x] Fetched ground truth, seeded properties and installed-wheel upgrade (items 7-9).
+- [x] Every supported Python minor tested, including free-threaded 3.14 (item 10).
+- [x] README, guide, changelog, metadata and archive inspection (items 11-14).
+- [x] Four gates and 23 deliberate mutations (items 15 and 18).
+- [x] Release PR [#3](https://github.com/JaviLianes8/threadfan/pull/3) prepared.
+- [ ] Independent reviewer (item 16).
+- [ ] Merge and publication (item 17).
 - [ ] Five independent QA lenses (item 19).
 
-## Starting state
+## Scorecard
 
-Resumed `release/1.0.0` at `4ff515a` on 2026-11-01; no prior certification report
-or saved lens verdicts were present. Baseline: 288 passed, one opt-in wheel test
-skipped, one failure for the missing 1.0.0 changelog entry.
-The existing release commit is retained. PyPI metadata was fetched from
-https://pypi.org/pypi/threadfan/json on 2026-11-01: current release 0.2.0.
+| Item | Verdict | Evidence |
+| --- | --- | --- |
+| 1. Stable API | PASS | Four public names; signatures, defaults and parameter names pinned; all changes in CHANGELOG. |
+| 2. Exact exports | PASS | Exact `__all__`, no extra public attributes, public module paths and pickle names tested. |
+| 3. Runnable docstrings | PASS | All four public docstrings, README and GUIDE examples executed. |
+| 4. Strict typing | PASS | `mypy --strict src tests`; installed-wheel typing consumer; `py.typed` shipped; error results' `Any` documented. |
+| 5. Errors | PASS | Typed validation errors; aggregate messages omit task text and results, bound type names and huge indices. Original caller errors remain accessible. |
+| 6. Full contracts | PASS | 329 passing tests including source, options, ordering, progress, cancellation, pickles and installed consumers. |
+| 7. Ground truth | PASS | Hash-pinned Python reference examples extracted and executed; live builtin and executor comparisons. |
+| 8. Real e2e | PASS | Wheel installed in a fresh venv; isolated subprocess consumer; actual 0.2.0 upgrade and bidirectional pickles. No CLI exists. |
+| 9. Seeded properties | PASS | 160 seeded oracle cases plus 1,500 additional cases; 20k/80k scaling in all four scheduling modes. |
+| 10. Interpreters | PASS | Seven CPython builds, 3.10 through 3.14, including 3.14 without the GIL; table below. |
+| 11. README | PASS | Problem, honest executor comparison, absolute links, badge, examples and guide; strict twine check. |
+| 12. CHANGELOG | PASS | Dated 1.0.0 section: 2026-11-01, including every behavior change from 0.2.0. |
+| 13. Metadata | PASS | 1.0.0, Production/Stable, Python >=3.10, 3.10-3.14 classifiers, MIT, project URLs, keywords, no runtime dependencies. |
+| 14. Archives | PASS | Wheel and sdist inspected; LICENSE and typing marker included; no fetched documents, caches or working notes. |
+| 15. Gates | PASS | Format, lint, strict source typing and pytest exit 0; source and tests also pass strict typing together. |
+| 16. Independent reviewer | PENDING | Reserved for the next review stage. |
+| 17. Release | PREPARED | PR #3, branch `release/1.0.0`; merge and publication pending. |
+| 18. Mutation round | PASS | 23/23 deliberately broken variants fail the contract/doctest suite; no survivor. |
+| 19. QA lenses | PENDING | a, b, c, d and e have no recorded verdicts. |
 
-## API review
+## API and compatibility
 
-The four public names, signatures and defaults are pinned by contract tests.
-`SupportsIndex` matches the already supported integer-like counts. Protocol
-callbacks accept arbitrary positional parameter names and any return value.
-Aggregate errors retain original exceptions and results but do not format task
-messages. The original cause and propagated task errors can still contain caller
-data. Public definitions use package paths; legacy pickle reconstruction is retained.
-All release changes are recorded in the dated CHANGELOG and GUIDE.
+Resumed at `4ff515a` on 2026-11-01 with no certification report or saved lens verdicts.
+Baseline: 288 passed, one opt-in wheel skip, one missing-changelog failure. The existing
+commit is preserved. Runtime code validated below is at `54dfbdf`; later changes add
+explicit installed-version assertions and this report.
 
-## Ground truth (item 7)
+The stable exports are `thread_map`, `thread_imap`, `ThreadMapError` and
+`ProgressCallback`. Count annotations now match integer-like inputs (`SupportsIndex`).
+Options are evaluated before input consumption; unordered batches follow callback
+arrival order. Ordered eager mapping can replenish work behind an unfinished head,
+while streaming retains an exact bounded window. Error messages omit task values;
+original exceptions and the chained cause still contain caller data, as documented.
+Copies and pickles retain dictionary and slot attributes of exception subclasses.
+Legacy 0.2.0 reconstruction paths remain readable. All differences are in the CHANGELOG.
 
-On 2026-11-01, fetched the CPython v3.14.0 `concurrent.futures` and `contextvars`
-reference sources. `tests/upstream/MANIFEST.json` records exact URLs, revision,
-date, byte lengths, SHA-256 and PSF licence; `scripts/fetch_upstream.py` verifies
-every download. Copies stay outside the repository. Missing references skip cleanly.
-`test_ground_truth` extracts the actual `pow` example operands and compares both
-entry points with a real executor. It executes the context example cut from the
-fetched document, checks its fetched expected output, then checks both mapping
-functions against the resulting context. Additional hand-written inputs run through
-the real executor for result ordering and lowest-index failure comparisons.
+## Ground truth
 
-## Interim validation
+Fetched on 2026-11-01 by `scripts/fetch_upstream.py`:
 
-The initial wheel and sdist passed `twine check --strict`; their contents were
-inspected. The isolated consumer and upgrade from actual PyPI 0.2.0 passed, including
-pickles in both directions at every protocol. There is no CLI or entry point.
-The interpreter sweep exposed a timing assumption in an old cancellation test:
-free-threaded Python could finish fast tasks before the caller observed a failure.
-The test now holds queued work with events. Slotted exception subclass state is now
-preserved, covered at every pickle protocol. The final sweep will use the rebuilt wheel.
-Current local gates: format, lint, strict typing of source and tests, and 328 tests
-pass; the optional wheel test is skipped in this quick run.
+- https://raw.githubusercontent.com/python/cpython/v3.14.0/Doc/library/concurrent.futures.rst
+- https://raw.githubusercontent.com/python/cpython/v3.14.0/Doc/library/contextvars.rst
 
-## Review stages
+`tests/upstream/MANIFEST.json` records URL, revision, date, size, SHA-256 and licence.
+Copies remain outside the repository; tests verify hashes and skip if files are absent.
+`test_ground_truth` extracts the actual executor example operands and compares both
+entry points with a real executor. It executes the context example extracted from the
+fetched document, checks the extracted expected output, and checks both mapping
+functions against the resulting context. Additional inputs are explicitly hand-written;
+their oracle is a real executor, including the lowest-index exception and its arguments.
+`test_oracle` compares with real builtin `map` across 40 seeds in four tests.
 
-Items 16 and 19 are pending. No independent reviewer or lens verdict is claimed.
-Merge and publication remain pending.
+## Properties and robustness
+
+The additional run uses seeds 211, 1207 and 99173, 500 cases each: random input sizes,
+values, failure positions, worker counts, window sizes and order modes. Both functions
+agree on values, error indices and partial results. All 1,500 cases pass.
+For 20,000 versus 80,000 items, observed times in seconds were:
+
+| Mode | 20k | 80k | Ratio |
+| --- | --- | --- | --- |
+| Ordered stream | 0.272 | 1.072 | 3.95 |
+| Ordered list | 0.275 | 1.092 | 3.98 |
+| Unordered stream | 0.255 | 1.038 | 4.07 |
+| Unordered list | 0.289 | 1.577 | 5.45 |
+
+Exact window contracts cover endless sources. Collected failures intentionally occupy
+memory until the source ends, and the guide states this limitation. Large messages,
+unprintable exceptions, huge integer indices and invalid option types are covered.
+Each pytest case has a 300-second timeout. A cancellation test's timing assumption
+was replaced with event-controlled queued work after the free-threaded run exposed it.
+
+## Packaging and Python matrix
+
+Fetched https://pypi.org/pypi/threadfan/json on 2026-11-01: 0.2.0 is published.
+`test_e2e_wheel` builds both distributions, inspects contents, runs `twine check --strict`,
+installs the wheel into a fresh venv, and executes a consumer via `python -I` from an
+empty directory. It checks values, errors, context, bounded streaming and thread cleanup.
+The opt-in upgrade test explicitly asserts 0.2.0 before upgrade and 1.0.0 afterwards;
+all pickle protocols are exchanged in both directions for the shared API.
+There is no CLI, `__main__` or console entry point.
+
+The wheel has 11 entries: package modules, `py.typed`, metadata and LICENSE. The sdist
+has 37 entries: source, tests, manifest, docs, development scripts and metadata. No
+fetched reference text, caches, venvs or certification notes are shipped.
+Final wheel SHA-256: `2d88ee94fb4effa91057499fb50d09675df3e6bf54bd3aa0e1967acf73a5cbd7`.
+Final sdist SHA-256: `a8b8c2da212781914271a26cc73e95d3c611fbe465d5881c787a809c2a04abf6`.
+
+The installed-wheel suite was taken from an extracted sdist with its `src` directory
+removed and pytest's source path disabled. Every import resolves under `site-packages`.
+The final wheel is byte-identical to the wheel used throughout this matrix:
+
+| CPython | Passed | Skipped |
+| --- | --- | --- |
+| 3.10.22 | 323 | 2 |
+| 3.11.18 | 324 | 1 |
+| 3.12.16 | 324 | 1 |
+| 3.13.18 | 324 | 1 |
+| 3.14.6 (system install) | 324 | 1 |
+| 3.14.10 | 324 | 1 |
+| 3.14.10 free-threaded | 324 | 1 |
+
+The common skip is the separately executed build/e2e test; 3.10 also skips `add_note`,
+which starts in 3.11. Public doctests run through the explicit documentation contract.
+The free-threaded interpreter reports `sys._is_gil_enabled() == False` with test
+imports loaded. Older launcher registrations were stale; isolated interpreters were
+downloaded without changing registrations. No supported minor version remains untested.
+
+## Mutation round
+
+Each variant changes one behavior in a scratch copy of the runtime source at `54dfbdf`.
+The normal contract/doctest suite runs with `-x` and the 300-second test timeout;
+the optional build/e2e test is excluded. Every variant exits 1 with an actual failing
+test, and the source is restored before the next variant. All 23 are killed.
+
+| # | Deliberate bug | First failing contract |
+| --- | --- | --- |
+| 1 | Drop slotted exception state | `tests/test_errors.py::test_subclass_slot_attributes_survive_pickling[0]` |
+| 2 | Allow one extra pending stream item | `tests/test_imap.py::test_endless_source_is_read_only_ahead_by_the_window[True]` |
+| 3 | Halve the default window | `tests/test_regressions.py::test_a_stream_closed_inside_its_own_worker_does_not_join_itself` |
+| 4 | Shift collected error indices by one | `doctest: ThreadMapError` |
+| 5 | Disable error collection | `doctest: ThreadMapError` |
+| 6 | Reuse one context for every task | `tests/test_options.py::test_context_changes_inside_tasks_do_not_leak` |
+| 7 | Disable context propagation | `tests/test_docs.py::test_every_readme_example_runs_in_order` |
+| 8 | Leave queued futures uncancelled | `tests/test_window_contract.py::test_eager_map_replenishes_behind_an_unfinished_head` |
+| 9 | Offset progress by one | `doctest: ProgressCallback` |
+| 10 | Discard callback failures | `tests/test_regressions.py::test_stop_iteration_from_progress_is_reraised_unchanged` |
+| 11 | Reverse eager results | `doctest: ProgressCallback` |
+| 12 | Lose partial results | `doctest: ThreadMapError` |
+| 13 | Chain the highest failure | `tests/test_errors.py::test_the_first_failure_is_the_cause` |
+| 14 | Keep mappings in completion order | `tests/test_errors.py::test_errors_are_sorted_by_input_index` |
+| 15 | Raise the wrong error for bool counts | `tests/test_options.py::test_non_int_counts_are_type_errors[workers-True]` |
+| 16 | Accept zero counts | `tests/test_imap.py::test_options_are_validated_when_called_not_when_iterated` |
+| 17 | Remove the item-count worker cap | `tests/test_options.py::test_pool_size_is_capped_by_items_and_default[None-3-3]` |
+| 18 | Change the default worker count to 31 | `tests/test_options.py::test_pool_size_is_capped_by_items_and_default[None-100-32]` |
+| 19 | Expose task error text | `doctest: ThreadMapError` |
+| 20 | Block eager work behind the head | `tests/test_window_contract.py::test_eager_map_replenishes_behind_an_unfinished_head` |
+| 21 | Discard source errors | `tests/test_regressions.py::test_items_read_before_a_failing_source_are_still_yielded[True]` |
+| 22 | Ignore the worker-name prefix | `tests/test_options.py::test_worker_threads_carry_the_prefix_as_the_standard_library_names_them` |
+| 23 | Reverse completed callback batches | `tests/test_scheduling_contract.py::test_unordered_batches_keep_callback_order[False-False]` |
+
+## Final gates and remaining stages
+
+On 2026-11-01: `ruff format --check .`, `ruff check .`, `mypy --strict src`,
+`mypy --strict src tests`, and pytest with `THREADFAN_UPSTREAM`, `THREADFAN_E2E=1`
+and `THREADFAN_E2E_PYPI=1` all succeed. Final source run: **329 passed, no skips**.
+All Python source files are at most 200 lines. The README badge matches the reference.
+
+Items 1-15 and 18 are complete. Independent review and lenses a-e remain pending;
+no verdict is carried forward. PR #3 is open; merge and publication remain pending.
