@@ -109,3 +109,23 @@ def test_spoofed_integer_class_is_rejected_in_both_mappings(mapping: str) -> Non
             ThreadMapError(given)
         else:
             ThreadMapError({}, given)
+
+
+@pytest.mark.parametrize("mapping", ["errors", "results"])
+def test_invalid_index_class_property_cannot_replace_type_error(mapping: str) -> None:
+    lookups: list[str] = []
+
+    class InvalidIndex:
+        @property  # type: ignore[misc]
+        def __class__(self) -> type[int]:  # type: ignore[override]
+            lookups.append("__class__")
+            raise RuntimeError("class lookup hook executed")
+
+    given: Any = {InvalidIndex(): ValueError()}
+    with pytest.raises(TypeError) as info:
+        if mapping == "errors":
+            ThreadMapError(given)
+        else:
+            ThreadMapError({}, given)
+    assert str(info.value) == f"{mapping} keys must be int indices, got InvalidIndex"
+    assert lookups == []

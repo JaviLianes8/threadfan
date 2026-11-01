@@ -50,6 +50,8 @@ All notable changes to this project are documented here. The format follows
 - Runnable examples, guide, Python 3.10 to 3.14 support and stable package metadata.
 - Contract tests, standard-library comparisons, installed-wheel upgrade checks,
   seeded scheduling properties and deliberate mutation checks.
+- Regression coverage for invalid aggregate keys with raising `__class__` properties
+  in both mappings, preserving `TypeError` without invoking the property.
 
 ## [0.2.0]
 
