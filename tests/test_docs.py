@@ -40,3 +40,18 @@ def test_version_matches_pyproject() -> None:
 def test_changelog_has_an_entry_for_this_version() -> None:
     text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     assert f"## [{threadfan.__version__}]" in text
+
+
+def test_guide_examples_run() -> None:
+    text = (ROOT / "GUIDE.md").read_text(encoding="utf-8")
+    namespace: dict[str, object] = {"__name__": "guide"}
+    blocks = re.findall(r"```python\n(.*?)```", text, flags=re.DOTALL)
+    assert blocks
+    for block in blocks:
+        exec(compile(block, "GUIDE.md", "exec"), namespace)
+
+
+def test_readme_links_are_absolute() -> None:
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    for link in re.findall(r"\]\(([^)]+)\)", text):
+        assert link.startswith("https://"), link

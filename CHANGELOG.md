@@ -6,6 +6,44 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-01
+
+### Stable
+
+- `thread_map`, `thread_imap`, `ThreadMapError` and `ProgressCallback`: bounded
+  thread scheduling, input or completion ordering, context copying, progress,
+  error collection and cancellation of queued tasks on early exits.
+
+### Changed
+
+- Export `ProgressCallback` as a structural protocol accepting two positional
+  integers and any return value. Count annotations accept `SupportsIndex`.
+- Validate callables and prefixes before reading input. Store a string subclass
+  prefix as plain text. Evaluate flags and integer-like counts once at call time.
+  `thread_imap` now calls `iter(items)` immediately, while item reads remain lazy.
+- `ThreadMapError` accepts and copies mappings, sorts indices, and rejects
+  noninteger or bool keys, nonmapping arguments and non-Exception failures.
+  Its message omits task messages and results; long type names and huge integers
+  have bounded descriptions. Original failures, results and cause remain accessible.
+- Public definitions and new pickles use package-level names. Existing 0.2.0
+  pickle paths remain readable; subclasses and their attributes still round-trip.
+- Ordered `thread_map` bounds in-flight work separately from buffered results,
+  keeping workers supplied behind a slow head. Streaming keeps its original bound.
+
+### Fixed
+
+- Unordered mode preserves completion callback arrival order within each batch
+  instead of reordering that batch by input index. Simultaneous completions can tie.
+- Cancel queued higher-index tasks as soon as an ordered task failure is observed.
+- Drain a completion queue instead of rescanning all pending futures on each wakeup.
+- Explicitly close the inner scheduler when a stream is closed.
+
+### Documentation and packaging
+
+- Runnable examples, guide, Python 3.10 to 3.14 support and stable package metadata.
+- Contract tests, standard-library comparisons, installed-wheel upgrade checks,
+  seeded scheduling properties and deliberate mutation checks.
+
 ## [0.2.0]
 
 ### Added

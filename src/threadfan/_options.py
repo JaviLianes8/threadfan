@@ -40,7 +40,7 @@ def check_count(name: str, value: object) -> int:
     return count
 
 
-def resolve_workers(workers: int | None, total: int | None = None) -> int:
+def resolve_workers(workers: SupportsIndex | None, total: int | None = None) -> int:
     """Pick the pool size: the given value or the default, never above ``total``."""
     size = MAX_DEFAULT_WORKERS if workers is None else check_count("workers", workers)
     if total is not None and total > 0:
@@ -48,7 +48,7 @@ def resolve_workers(workers: int | None, total: int | None = None) -> int:
     return size
 
 
-def resolve_window(max_pending: int | None, workers: int) -> int:
+def resolve_window(max_pending: SupportsIndex | None, workers: int) -> int:
     """Pick how many items may be submitted and not yet consumed at once."""
     if max_pending is None:
         return 2 * workers

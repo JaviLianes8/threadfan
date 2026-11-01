@@ -30,7 +30,10 @@ def test_non_int_counts_are_type_errors(name: str, bad: object) -> None:
 @pytest.mark.parametrize("name", ["workers", "max_pending"])
 def test_counts_below_one_are_value_errors(name: str, bad: int) -> None:
     with pytest.raises(ValueError, match=f"{name} must be at least 1") as info:
-        thread_imap(lambda v: v, [1], **{name: bad})
+        if name == "workers":
+            thread_imap(lambda v: v, [1], workers=bad)
+        else:
+            thread_imap(lambda v: v, [1], max_pending=bad)
     assert len(str(info.value)) < 80
 
 
@@ -44,9 +47,9 @@ def test_fn_and_on_progress_must_be_callable(call: Any) -> None:
 
 def test_items_must_be_iterable_when_called() -> None:
     with pytest.raises(TypeError):
-        thread_map(str, 5)  # type: ignore[call-overload]
+        thread_map(str, 5)  # type: ignore[arg-type]
     with pytest.raises(TypeError):
-        thread_imap(str, 5)  # type: ignore[call-overload]
+        thread_imap(str, 5)  # type: ignore[arg-type]
 
 
 def test_options_are_checked_before_items_are_read() -> None:

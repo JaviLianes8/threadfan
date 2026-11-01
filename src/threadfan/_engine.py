@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextvars
 import queue
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Generic, TypeVar
@@ -40,7 +40,7 @@ class Run(Generic[T, R]):
     errors: dict[int, Exception] = field(default_factory=dict)
     failure: BaseException | None = None
 
-    def stream(self, source: Iterator[T]) -> Iterator[tuple[int, R]]:
+    def stream(self, source: Iterator[T]) -> Generator[tuple[int, R], None, None]:
         """Yield ``(index, value)`` for each success, in input or completion order.
 
         The window caps the items read from ``source`` and not yet yielded (or, for
@@ -78,7 +78,7 @@ class Run(Generic[T, R]):
                 if not pending:
                     self.failure = source_error
                     return
-                for future in _settled(finished, pending):
+                for future in _settled(finished):
                     index = pending.pop(future)
                     if future.cancelled():
                         continue
@@ -141,16 +141,14 @@ class Run(Generic[T, R]):
         return True
 
 
-def _settled(
-    finished: queue.SimpleQueue[Future[R]], pending: dict[Future[R], int]
-) -> list[Future[R]]:
-    """Wait for one task to settle, take every other settled one, sort by input index."""
+def _settled(finished: queue.SimpleQueue[Future[R]]) -> list[Future[R]]:
+    """Drain completed callbacks in arrival order; simultaneous finishes may tie."""
     batch = [finished.get()]
     while True:
         try:
             batch.append(finished.get_nowait())
         except queue.Empty:
-            return sorted(batch, key=pending.__getitem__)
+            return batch
 
 
 def _cancel_after(index: int, pending: dict[Future[R], int]) -> None:

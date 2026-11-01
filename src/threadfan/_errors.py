@@ -8,7 +8,6 @@ from typing import Any
 
 from ._options import show_int, type_name
 
-_DETAIL_LIMIT = 200
 # The constructor that pickle protocol 2 and later name NEWOBJ; typeshed does not declare it.
 _NEWOBJ: Callable[..., object] = vars(copyreg)["__newobj__"]
 
@@ -22,8 +21,10 @@ class ThreadMapError(Exception):
     sorted by index. :func:`thread_imap` has already yielded its values, so its
     :attr:`results` is empty. The failure with the lowest index is the ``__cause__``.
 
-    The message gives the number of failures and the first one, cut to 200 characters
-    of ``Type: message``. Building one by hand takes any mapping from ``int`` indices
+    The message gives the number of failures, first index and exception type, without
+    formatting task messages or results. The original exceptions and cause still hold
+    the caller's data; handle those explicitly before logging a full traceback.
+    Building one by hand takes any mapping from ``int`` indices
     to exceptions (and to results); anything else raises ``TypeError``. It pickles,
     subclasses and their attributes included, when its contents pickle.
 
@@ -33,7 +34,7 @@ class ThreadMapError(Exception):
     ... except ThreadMapError as error:
     ...     print(error)
     ...     print(error.results, list(error.errors))
-    2 tasks failed; first at index 1: ValueError: invalid literal for int() with base 10: 'x'
+    2 tasks failed; first at index 1: ValueError
     {0: 1, 2: 3} [1, 3]
     """
 
@@ -73,16 +74,13 @@ def _describe(errors: dict[int, Exception]) -> str:
     if not errors:
         return f"{count} {noun} failed"
     index, error = next(iter(errors.items()))
-    return f"{count} {noun} failed; first at index {show_int(index)}: {_summary(error)}"
+    return f"{count} {noun} failed; first at index {show_int(index)}: {type_name(error)}"
 
 
-def _summary(error: Exception) -> str:
-    try:
-        text = str(error)
-    except Exception:
-        # A broken ``__str__`` must not replace the error that carries every result.
-        text = "<message could not be read>"
-    detail = f"{type_name(error)}: {text}" if text else type_name(error)
-    if len(detail) <= _DETAIL_LIMIT:
-        return detail
-    return detail[: _DETAIL_LIMIT - 3] + "..."
+def _rebuild(
+    cls: type[ThreadMapError], errors: Mapping[int, Exception], results: Mapping[int, Any]
+) -> ThreadMapError:
+    # Published 0.2.0 pickles refer to this function, so keep it for existing data.
+    error = cls.__new__(cls)
+    ThreadMapError.__init__(error, errors, results)
+    return error

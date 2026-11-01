@@ -39,7 +39,7 @@ def test_successful_results_are_kept_by_index() -> None:
 
 
 def test_message_names_the_count_and_the_first_failure() -> None:
-    assert str(_collect()) == "3 tasks failed; first at index 1: LookupError: missing 1"
+    assert str(_collect()) == "3 tasks failed; first at index 1: LookupError"
 
 
 def test_single_failure_message_is_singular_and_empty_messages_show_the_type() -> None:
@@ -81,13 +81,13 @@ def test_wrong_contents_raise_type_error(build: Callable[[], object]) -> None:
         build()
 
 
-def test_the_message_is_cut_to_two_hundred_characters_of_detail() -> None:
-    error = ThreadMapError({0: ValueError("x" * 1_000_000)})
-    detail = str(error).split(": ", 1)[1]
-    assert len(detail) == 200 and detail.endswith("...")
-    assert detail.startswith("ValueError: xxx")
-    exact = ThreadMapError({0: ValueError("y" * (200 - len("ValueError: ")))})
-    assert not str(exact).endswith("...")
+def test_messages_do_not_format_task_input_or_results() -> None:
+    secret = "password=private-value"
+    for message in (secret, "x" * 1_000_000):
+        error = ThreadMapError({0: ValueError(message)}, {1: secret})
+        assert str(error) == "1 task failed; first at index 0: ValueError"
+        assert error.errors[0].args == (message,)
+        assert error.results == {1: secret}
 
 
 def test_an_unreadable_message_does_not_replace_the_error() -> None:
@@ -100,7 +100,7 @@ def test_an_unreadable_message_does_not_replace_the_error() -> None:
 
     with pytest.raises(ThreadMapError) as info:
         thread_map(fail, [1, 2], stop_on_error=False)
-    assert str(info.value) == "2 tasks failed; first at index 0: Broken: <message could not be read>"
+    assert str(info.value) == "2 tasks failed; first at index 0: Broken"
     assert info.value.results == {} and list(info.value.errors) == [0, 1]
 
 

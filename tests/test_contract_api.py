@@ -6,7 +6,7 @@ import doctest
 import inspect
 import pickle
 import typing
-from typing import Protocol
+from typing import Protocol, SupportsIndex
 
 import pytest
 
@@ -16,9 +16,12 @@ import threadfan._map
 import threadfan._progress
 from threadfan import ProgressCallback, ThreadMapError, thread_imap, thread_map
 
-OPTIONS = "*, workers: 'int | None' = None, ordered: 'bool' = True, stop_on_error: 'bool' = True, "
+OPTIONS = (
+    "*, workers: 'SupportsIndex | None' = None, "
+    "ordered: 'bool' = True, stop_on_error: 'bool' = True, "
+)
 TAIL = (
-    "max_pending: 'int | None' = None, copy_context: 'bool' = False, "
+    "max_pending: 'SupportsIndex | None' = None, copy_context: 'bool' = False, "
     "thread_name_prefix: 'str' = 'threadfan')"
 )
 SIGNATURES = {
@@ -56,7 +59,7 @@ def test_type_hints_resolve_at_run_time() -> None:
         typing.get_type_hints(getattr(threadfan, name))
     hints = typing.get_type_hints(thread_map)
     assert set(typing.get_args(hints["on_progress"])) == {ProgressCallback, type(None)}
-    assert set(typing.get_args(hints["workers"])) == {int, type(None)}
+    assert set(typing.get_args(hints["workers"])) == {SupportsIndex, type(None)}
     assert typing.get_args(typing.get_type_hints(thread_imap)["return"])[1:] == (None, None)
     assert set(typing.get_type_hints(ThreadMapError.__init__)) == {"errors", "results", "return"}
     assert typing.get_type_hints(ProgressCallback.__call__)["return"] is object

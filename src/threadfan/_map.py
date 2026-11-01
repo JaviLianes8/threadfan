@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import contextvars
 from collections.abc import Callable, Generator, Iterable, Iterator
-from typing import TypeVar
+from contextlib import closing
+from typing import SupportsIndex, TypeVar
 
 from ._engine import Run
 from ._errors import ThreadMapError
@@ -21,11 +22,11 @@ def thread_map(
     fn: Callable[[T], R],
     items: Iterable[T],
     *,
-    workers: int | None = None,
+    workers: SupportsIndex | None = None,
     ordered: bool = True,
     stop_on_error: bool = True,
     on_progress: ProgressCallback | None = None,
-    max_pending: int | None = None,
+    max_pending: SupportsIndex | None = None,
     copy_context: bool = False,
     thread_name_prefix: str = DEFAULT_PREFIX,
 ) -> list[R]:
@@ -70,8 +71,9 @@ def thread_map(
     work = list(items)
     if not work:
         return []
-    run.workers = resolve_workers(workers, len(work))
-    run.window = resolve_window(max_pending, run.workers)
+    run.workers = min(run.workers, len(work))
+    if max_pending is None:
+        run.window = resolve_window(None, run.workers)
     run.hold_unyielded = False
     run.on_progress = on_progress
     run.total = len(work)
@@ -87,10 +89,10 @@ def thread_imap(
     fn: Callable[[T], R],
     items: Iterable[T],
     *,
-    workers: int | None = None,
+    workers: SupportsIndex | None = None,
     ordered: bool = True,
     stop_on_error: bool = True,
-    max_pending: int | None = None,
+    max_pending: SupportsIndex | None = None,
     copy_context: bool = False,
     thread_name_prefix: str = DEFAULT_PREFIX,
 ) -> Generator[R, None, None]:
@@ -129,8 +131,9 @@ def thread_imap(
 
 
 def _stream(run: Run[T, R], source: Iterator[T]) -> Generator[R, None, None]:
-    for _, value in run.stream(source):
-        yield value
+    with closing(run.stream(source)) as stream:
+        for _, value in stream:
+            yield value
     if run.failure is not None:
         raise run.failure
     if run.errors:
@@ -139,8 +142,8 @@ def _stream(run: Run[T, R], source: Iterator[T]) -> Generator[R, None, None]:
 
 def _prepare(
     fn: Callable[[T], R],
-    workers: int | None,
-    max_pending: int | None,
+    workers: SupportsIndex | None,
+    max_pending: SupportsIndex | None,
     ordered: bool,
     stop_on_error: bool,
     copy_context: bool,

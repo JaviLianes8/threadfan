@@ -1,5 +1,7 @@
 # threadfan
 
+[![Lianes8 Certified](https://lianes8studio.com/certified/lianes8-certified-badge.svg)](https://lianes8studio.com/certified)
+
 Typed, ordered parallel map over a bounded thread pool for IO-bound fan-out.
 
 ## Install
@@ -42,7 +44,8 @@ assert sorted(done) == sorted(bodies)
 
 ### Errors
 
-By default the first failure is re-raised unchanged, queued items are cancelled,
+By default the lowest failing input index is re-raised unchanged (the first observed
+failure in unordered mode), queued items are cancelled,
 and the call returns once the tasks already running finish. Set
 `stop_on_error=False` to run every item and collect the failures instead. The
 `ThreadMapError` keeps the failures and the successful results, both keyed by
@@ -61,10 +64,14 @@ try:
 except ThreadMapError as error:
     assert list(error.errors) == [1, 3]
     assert error.results == {0: 1, 2: 3}
-    print(error)  # 2 tasks failed; first at index 1: ValueError: ...
+    print(error)  # 2 tasks failed; first at index 1: ValueError
 ```
 
 `KeyboardInterrupt` and `SystemExit` are never collected: they stop the run at once.
+
+`ThreadMapError` messages omit task messages and results. Its `errors`, `results`
+and chained cause still hold the original values, so a full traceback can contain
+sensitive task data.
 
 `ThreadMapError` pickles, subclasses included, as long as the exceptions and
 results it holds can be pickled themselves.
@@ -72,7 +79,8 @@ results it holds can be pickled themselves.
 ### Progress
 
 `on_progress(completed, total)` runs in the calling thread after each item,
-failures included, with `completed` going from 1 to `total`:
+collected failures included, with `completed` going from 1 to `total` on a full
+run. Early failure or a failing callback stops progress:
 
 ```python
 thread_map(fetch, urls, workers=8, on_progress=lambda done, total: print(f"{done}/{total}"))
@@ -86,13 +94,15 @@ bounded and endless sources work:
 
 ```python
 import itertools
+from contextlib import closing
 
 from threadfan import thread_imap
 
 pages = (f"https://example.test/page/{n}" for n in itertools.count())
-for body in thread_imap(fetch, pages, workers=4):
-    if body.endswith("/5"):
-        break  # the queued pages are cancelled when the stream is released
+with closing(thread_imap(fetch, pages, workers=4)) as stream:
+    for body in stream:
+        if body.endswith("/5"):
+            break
 ```
 
 At most `max_pending` items (default twice `workers`) are submitted and not yet
@@ -143,19 +153,28 @@ function: mapping `Callable[[int], str]` gives `list[str]` from `thread_map` and
 
 ## Why
 
-The standard `ThreadPoolExecutor.map` is the usual tool for IO-bound fan-out, but
-its controls are thin: it collects the whole input before starting (unless you
-are on Python 3.14 and pass `buffersize`), its `chunksize` does nothing for
-threads, it has no ordered-versus-as-completed switch, no progress hook, and its
-error handling surfaces one failure at a time as you iterate. `threadfan` keeps
-the simple `map` shape and adds the controls that are missing: a hard worker
-bound, a bounded submission window, an order switch, a progress callback,
-context propagation, and a choice between stopping on the first error or running
-everything and raising one aggregated error.
+[ThreadPoolExecutor](https://docs.python.org/3.14/library/concurrent.futures.html)
+already provides a worker bound, futures and an ordered `map`. Python 3.14 adds
+`buffersize` to bound pending map results; older versions submit the whole input.
+Use it directly when those controls suffice, or combine `submit` and `as_completed`
+when you want to manage futures yourself. `threadfan` packages an order switch,
+progress callbacks, per-task context copies and aggregate failures in two functions,
+with bounded submission on Python 3.10 and newer. Threads suit waiting on IO;
+this library does not promise to accelerate Python CPU work or interrupt running tasks.
+
+## Guide and development
+
+The [GUIDE](https://github.com/JaviLianes8/threadfan/blob/main/GUIDE.md) specifies
+ordering, shutdown, errors and upgrading from 0.2.0. The
+[CHANGELOG](https://github.com/JaviLianes8/threadfan/blob/main/CHANGELOG.md) records
+release changes. There is no CLI: the inputs include a Python callable.
+Run `scripts/check.ps1` for the local gates; set `THREADFAN_E2E=1` for wheel tests.
+Fetch optional reference material with `python scripts/fetch_upstream.py DIRECTORY`,
+and set `THREADFAN_UPSTREAM` to that directory to include the specification tests.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/JaviLianes8/threadfan/blob/main/LICENSE).
 
 ## Links
 
