@@ -212,7 +212,8 @@ predates this round; no new cross-version matrix result is claimed here.
 ## QA lenses, round 2
 
 Review target: `262fbb49b8e6ef2edca8a11a1f53ff7b3febca39`, on 2026-11-01.
-Implementation: `fix aggregate class lookup and strengthen error contracts`.
+Implementation commit: `47092016c545256563ca3d7c94bf28f374568dda`
+(`fix aggregate class lookup and strengthen error contracts`).
 Lens c reported one medium behavior defect; lens e reported one medium contract gap.
 Both findings are addressed. Independent lens re-review remains pending.
 
