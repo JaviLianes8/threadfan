@@ -6,6 +6,61 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-01
+
+### Stable
+
+- `thread_map`, `thread_imap`, `ThreadMapError` and `ProgressCallback`: bounded
+  thread scheduling, input or completion ordering, context copying, progress,
+  error collection and cancellation of queued tasks on early exits.
+
+### Changed
+
+- Export `ProgressCallback` as a structural protocol accepting two positional
+  integers and any return value. Count annotations accept `SupportsIndex`.
+- Validate callables and prefixes before reading input. Store a string subclass
+  prefix as plain text. Evaluate flags and integer-like counts once at call time.
+  `thread_imap` now calls `iter(items)` immediately, while item reads remain lazy.
+- `ThreadMapError` accepts and copies mappings, sorts indices, and rejects
+  noninteger or bool keys, nonmapping arguments and non-Exception failures.
+  Its message omits task messages and results; long type names and huge integers
+  have bounded descriptions. Original failures, results and cause remain accessible.
+- Public definitions and new pickles use package-level names. Existing 0.2.0
+  pickle paths remain readable; subclasses and their attributes still round-trip.
+- Ordered `thread_map` bounds in-flight work separately from buffered results,
+  keeping workers supplied behind a slow head. Streaming keeps its original bound.
+
+### Fixed
+
+- Accept integer and index-convertible counts without consulting `__class__` hooks,
+  while still rejecting bool counts and evaluating index conversion once.
+- Validate prefixes, aggregate mappings and failure values by actual runtime types,
+  preserving `TypeError` for invalid inputs and support for registered mappings.
+- Propagate original fatal exceptions regardless of misleading `__class__` hooks,
+  including when collecting failures or waiting for results in input order.
+- Validate aggregate keys by their actual types, so integer-subclass `__class__`
+  hooks cannot interrupt construction of either the errors or results mapping.
+- Normalize aggregate index subclasses to built-in integers before storing, sorting
+  or describing them, preserving numeric order without invoking subclass hooks.
+- Read bounded type names without invoking metaclass or string-subclass hooks, so
+  validation and aggregation retain their documented errors and message limits.
+- Unordered mode preserves completion callback arrival order within each batch
+  instead of reordering that batch by input index. Simultaneous completions can tie.
+- Cancel queued higher-index tasks as soon as an ordered task failure is observed.
+- Drain a completion queue instead of rescanning all pending futures on each wakeup.
+- Explicitly close the inner scheduler when a stream is closed.
+- Preserve slotted subclass attributes when copying or pickling aggregate errors.
+
+### Documentation and packaging
+
+- Runnable examples, guide, Python 3.10 to 3.14 support and stable package metadata.
+- Contract tests, standard-library comparisons, installed-wheel upgrade checks,
+  seeded scheduling properties and deliberate mutation checks.
+- Regression coverage for invalid aggregate keys with raising `__class__` properties
+  in both mappings, preserving `TypeError` without invoking the property.
+- Contracts cover class hooks across count options, prefixes, aggregate construction
+  and fatal exceptions through both mapping APIs and ordering modes.
+
 ## [0.2.0]
 
 ### Added

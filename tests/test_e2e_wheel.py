@@ -8,7 +8,9 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tarfile
 import venv
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -53,7 +55,7 @@ def source():
 stream = thread_imap(lambda v: v, source(), workers=2, max_pending=3,
                      thread_name_prefix="e2e")
 assert [next(stream) for _ in range(10)] == list(range(10))
-assert read - 10 <= 3
+assert read - 10 < 3
 stream.close()
 assert not [t for t in threading.enumerate() if t.name.startswith("e2e")]
 
@@ -63,18 +65,79 @@ assert thread_map(lambda _: var.get(), range(2), copy_context=True) == ["set", "
 print("e2e ok")
 """
 
+PICKLE_TYPES = """
+from threadfan import ThreadMapError
+
+class SlottedResults(ThreadMapError):
+    __slots__ = ("results",)
+
+class SlottedMappings(ThreadMapError):
+    __slots__ = ("errors", "results")
+"""
+
+PICKLE_PROGRAM = """
+import pathlib, pickle, sys
+from threadfan import ThreadMapError, thread_imap, thread_map
+folder = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(folder))
+from pickle_types import SlottedResults, SlottedMappings
+mode = sys.argv[2]
+for cls in (ThreadMapError, SlottedResults, SlottedMappings):
+    for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
+        path = folder / f"{cls.__name__}-{protocol}.pickle"
+        if mode == "write":
+            original = cls({1: ValueError("bad")}, {0: "ok"})
+            original.label = "batch"
+            if cls is not ThreadMapError:
+                assert "results" not in original.__dict__
+            if cls is SlottedMappings:
+                assert "errors" not in original.__dict__
+            data = (original, thread_map, thread_imap)
+            path.write_bytes(pickle.dumps(data, protocol))
+        error, mapped, streamed = pickle.loads(path.read_bytes())
+        assert type(error) is cls and error.label == "batch"
+        assert error.results == {0: "ok"} and list(error.errors) == [1]
+        assert error.errors[1].args == ("bad",)
+        assert mapped is thread_map and streamed is thread_imap
+"""
+
 
 def _run(*cmd: str | Path, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [str(c) for c in cmd], cwd=cwd, capture_output=True, text=True, check=False
+        [str(c) for c in cmd], cwd=cwd, capture_output=True, text=True, check=False, timeout=180
     )
+
+
+def _consumer(python: Path, work: Path, version: str) -> subprocess.CompletedProcess[str]:
+    program = PROGRAM + f"\nassert threadfan.__version__ == {version!r}\n"
+    return _run(python, "-I", "-c", program, cwd=work)
 
 
 def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
     dist = tmp_path / "dist"
-    built = _run(sys.executable, "-m", "build", "--wheel", "--outdir", dist, ROOT)
+    built = _run(sys.executable, "-m", "build", "--outdir", dist, ROOT)
     assert built.returncode == 0, built.stderr
     (wheel,) = dist.glob("threadfan-*.whl")
+    (sdist,) = dist.glob("threadfan-*.tar.gz")
+    with zipfile.ZipFile(wheel) as archive:
+        names = archive.namelist()
+        assert "threadfan/py.typed" in names
+        assert any(name.endswith("licenses/LICENSE") for name in names)
+        assert all(name.startswith(("threadfan/", "threadfan-1.0.0.dist-info/")) for name in names)
+        assert not any("__pycache__" in name or name.endswith(".pyc") for name in names)
+        assert not any(name.endswith("entry_points.txt") for name in names)
+    with tarfile.open(sdist) as archive:
+        names = archive.getnames()
+        assert "threadfan-1.0.0/LICENSE" in names
+        assert "threadfan-1.0.0/GUIDE.md" in names
+        assert "threadfan-1.0.0/tests/upstream/MANIFEST.json" in names
+        assert not any(
+            bad in name
+            for name in names
+            for bad in (".rst", "__pycache__", ".pyc", "CERT-", "IMPROVEMENTS-", ".venv")
+        )
+    checked = _run(sys.executable, "-m", "twine", "check", "--strict", wheel, sdist)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
 
     env_dir = tmp_path / "venv"
     venv.create(env_dir, with_pip=True)
@@ -86,6 +149,29 @@ def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
     # Run from an empty folder so the source tree cannot shadow the install.
     work = tmp_path / "work"
     work.mkdir()
-    result = _run(python, "-I", "-c", PROGRAM, cwd=work)
+    result = _consumer(python, work, "1.0.0")
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "e2e ok"
+
+    if os.environ.get("THREADFAN_E2E_PYPI") == "1":
+        installed = _run(python, "-m", "pip", "install", "--no-deps", "threadfan==0.2.0")
+        assert installed.returncode == 0, installed.stderr
+        old = _consumer(python, work, "0.2.0")
+        assert old.returncode == 0, old.stderr
+        (work / "pickle_types.py").write_text(PICKLE_TYPES, encoding="utf-8")
+        saved = _run(python, "-I", "-c", PICKLE_PROGRAM, work, "write", cwd=work)
+        assert saved.returncode == 0, saved.stderr
+        installed = _run(python, "-m", "pip", "install", "--no-deps", "--upgrade", wheel)
+        assert installed.returncode == 0, installed.stderr
+        loaded = _run(python, "-I", "-c", PICKLE_PROGRAM, work, "read", cwd=work)
+        assert loaded.returncode == 0, loaded.stderr
+        result = _consumer(python, work, "1.0.0")
+        assert result.returncode == 0, result.stderr
+        saved = _run(python, "-I", "-c", PICKLE_PROGRAM, work, "write", cwd=work)
+        assert saved.returncode == 0, saved.stderr
+        installed = _run(python, "-m", "pip", "install", "--no-deps", "threadfan==0.2.0")
+        assert installed.returncode == 0, installed.stderr
+        loaded = _run(python, "-I", "-c", PICKLE_PROGRAM, work, "read", cwd=work)
+        assert loaded.returncode == 0, loaded.stderr
+        installed = _run(python, "-m", "pip", "install", "--no-deps", "--upgrade", wheel)
+        assert installed.returncode == 0, installed.stderr

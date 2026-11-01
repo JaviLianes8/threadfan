@@ -1,0 +1,20 @@
+{
+  "futures.rst": {
+    "url": "https://raw.githubusercontent.com/python/cpython/v3.14.0/Doc/library/concurrent.futures.rst",
+    "revision": "v3.14.0",
+    "fetched": "2026-11-01",
+    "size": 29385,
+    "sha256": "ec446948198e8376eb0d806296e2c055397f9fb3eac8c5ee4bf4a2566dfd5da4",
+    "license": "PSF-2.0",
+    "license_url": "https://github.com/python/cpython/blob/v3.14.0/LICENSE"
+  },
+  "contextvars.rst": {
+    "url": "https://raw.githubusercontent.com/python/cpython/v3.14.0/Doc/library/contextvars.rst",
+    "revision": "v3.14.0",
+    "fetched": "2026-11-01",
+    "size": 10427,
+    "sha256": "5988d55d4beb1e8322da241825eb13f4f12d8e8a97b174f5784161a16502b34e",
+    "license": "PSF-2.0",
+    "license_url": "https://github.com/python/cpython/blob/v3.14.0/LICENSE"
+  }
+}

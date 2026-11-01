@@ -4,18 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "threadfan"
-version = "0.2.0"
+version = "1.0.0"
 description = "Typed, ordered parallel map over a bounded thread pool for IO-bound fan-out"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Javier Lianes", email = "javier@lianes8studio.com" }]
-keywords = ["threads", "thread pool", "parallel map", "concurrency", "fan-out", "typed"]
+keywords = ["threads", "thread pool", "parallel map", "imap", "concurrency", "fan-out", "backpressure", "contextvars", "typed"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -23,21 +22,34 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries",
     "Typing :: Typed",
 ]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy", "pytest", "build", "twine"]
+dev = ["ruff", "mypy", "pytest", "pytest-timeout", "build", "twine"]
 
 [project.urls]
 Homepage = "https://lianes8studio.com"
-Repository = "https://github.com/JaviLianes8/threadfan"
+Source = "https://github.com/JaviLianes8/threadfan"
 Issues = "https://github.com/JaviLianes8/threadfan/issues"
 Changelog = "https://github.com/JaviLianes8/threadfan/blob/main/CHANGELOG.md"
 LinkedIn = "https://www.linkedin.com/in/jlianes/"
 Funding = "https://buymeacoffee.com/jlianesglrs"
+
+[tool.hatch.build.targets.sdist]
+# Third-party reference files are fetched locally and never shipped; only their manifest is.
+exclude = [
+    ".github",
+    ".gitattributes",
+    ".gitignore",
+    "IMPROVEMENTS-round*.md",
+    "CERT-1.0-*.md",
+    "tests/upstream/*",
+    "!tests/upstream/MANIFEST.json",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/threadfan"]
@@ -54,6 +66,7 @@ python_version = "3.10"
 strict = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["src", "tests"]
 pythonpath = ["src"]
-addopts = "-q"
+addopts = "-q --doctest-modules"
+timeout = 300

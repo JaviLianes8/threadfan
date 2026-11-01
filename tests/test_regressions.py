@@ -118,7 +118,7 @@ def test_integer_like_counts_are_accepted() -> None:
     options: dict[str, Any] = {"workers": Count(2), "max_pending": Count(3)}
     assert thread_map(lambda v: v, range(5), **options) == [0, 1, 2, 3, 4]
     with pytest.raises(ValueError, match="workers must be at least 1"):
-        thread_map(lambda v: v, [1], workers=Count(0))  # type: ignore[arg-type]
+        thread_map(lambda v: v, [1], workers=Count(0))
 
 
 @pytest.mark.filterwarnings("error::pytest.PytestUnraisableExceptionWarning")

@@ -42,7 +42,7 @@ def test_endless_source_is_read_only_ahead_by_the_window(ordered: bool) -> None:
     stream = thread_imap(lambda value: value, source, workers=2, max_pending=3, ordered=ordered)
     for consumed in range(1, 51):
         next(stream)
-        assert source.read - consumed <= 3
+        assert source.read - consumed < 3
     stream.close()
 
 
