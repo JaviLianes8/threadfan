@@ -8,7 +8,7 @@ import threading
 from collections.abc import Callable, Generator, Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, cast
 
 from ._progress import ProgressCallback
 
@@ -83,15 +83,16 @@ class Run(Generic[T, R]):
                     if future.cancelled():
                         continue
                     error = future.exception()
+                    # Instance class hooks must not turn fatal errors into ordinary exceptions.
                     if error is None:
                         pass
-                    elif isinstance(error, Exception) and not self.stop_on_error:
-                        self.errors[index] = error
-                    elif isinstance(error, Exception) and self.ordered:
+                    elif issubclass(type(error), Exception) and not self.stop_on_error:
+                        self.errors[index] = cast(Exception, error)
+                    elif issubclass(type(error), Exception) and self.ordered:
                         if stop_at is None:
                             _cancel_after(index, pending)
                         if stop_at is None or index < stop_at:
-                            stop_at, stop_error = index, error
+                            stop_at, stop_error = index, cast(Exception, error)
                         continue
                     else:
                         self.failure = error

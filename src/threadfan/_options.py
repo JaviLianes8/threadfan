@@ -30,7 +30,7 @@ def show_int(value: int) -> str:
 def check_count(name: str, value: object) -> int:
     """Return ``value`` as an ``int`` if it is an integer of at least 1, raise otherwise."""
     # bool is an int subclass, but ``workers=True`` is always a mistake.
-    if isinstance(value, bool):
+    if type(value) is bool:
         raise TypeError(f"{name} must be an int, got bool")
     # Integer-like values work too (numpy integers, anything with __index__).
     try:
@@ -59,10 +59,10 @@ def resolve_window(max_pending: SupportsIndex | None, workers: int) -> int:
 
 def check_prefix(prefix: object) -> str:
     """Return the thread name prefix as a plain ``str``, raise if it is not a string."""
-    if not isinstance(prefix, str):
+    if not issubclass(type(prefix), str):
         raise TypeError(f"thread_name_prefix must be a str, got {type_name(prefix)}")
     # A plain copy: a str subclass could override how the pool formats the names.
-    return str.__str__(prefix)
+    return str.__str__(cast(str, prefix))
 
 
 def check_callable(name: str, value: object) -> None:

@@ -32,6 +32,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Accept integer and index-convertible counts without consulting `__class__` hooks,
+  while still rejecting bool counts and evaluating index conversion once.
+- Validate prefixes, aggregate mappings and failure values by actual runtime types,
+  preserving `TypeError` for invalid inputs and support for registered mappings.
+- Propagate original fatal exceptions regardless of misleading `__class__` hooks,
+  including when collecting failures or waiting for results in input order.
 - Validate aggregate keys by their actual types, so integer-subclass `__class__`
   hooks cannot interrupt construction of either the errors or results mapping.
 - Normalize aggregate index subclasses to built-in integers before storing, sorting
@@ -52,6 +58,8 @@ All notable changes to this project are documented here. The format follows
   seeded scheduling properties and deliberate mutation checks.
 - Regression coverage for invalid aggregate keys with raising `__class__` properties
   in both mappings, preserving `TypeError` without invoking the property.
+- Contracts cover class hooks across count options, prefixes, aggregate construction
+  and fatal exceptions through both mapping APIs and ordering modes.
 
 ## [0.2.0]
 

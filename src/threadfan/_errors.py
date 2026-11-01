@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copyreg
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, cast
 
 from ._options import show_int, type_name
 
@@ -63,16 +63,16 @@ class ThreadMapError(Exception):
 
 
 def _by_index(name: str, mapping: object, *, failures: bool) -> dict[int, Any]:
-    if not isinstance(mapping, Mapping):
+    if not issubclass(type(mapping), Mapping):
         raise TypeError(f"{name} must be a mapping, got {type_name(mapping)}")
     pairs = []
-    for index, value in mapping.items():
+    for index, value in cast(Mapping[object, Any], mapping).items():
         index_type = type(index)
         if index_type is bool or not issubclass(index_type, int):
             raise TypeError(f"{name} keys must be int indices, got {type_name(index)}")
-        if failures and not isinstance(value, Exception):
+        if failures and not issubclass(type(value), Exception):
             raise TypeError(f"{name} values must be exceptions, got {type_name(value)}")
-        pairs.append((int.__int__(index), value))
+        pairs.append((int.__int__(cast(int, index)), value))
     return dict(sorted(pairs, key=lambda pair: pair[0]))
 
 

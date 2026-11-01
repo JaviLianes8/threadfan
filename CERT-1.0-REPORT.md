@@ -11,6 +11,7 @@ Progress:
 - [x] QA round 1 fixes for C-01, C-02 and E-01 through E-07, with regression evidence.
 - [x] QA round 2 fixes for C-03 and E-08, with regression and mutation evidence.
 - [x] QA round 3 fix for E-09, with regression and mutation evidence.
+- [x] Independent review round 1 fixes for CERT-05 and CERT-06.
 - [ ] Independent reviewer (item 16).
 - [ ] Merge and publication (item 17).
 - [ ] Five independent QA lenses (item 19).
@@ -24,7 +25,7 @@ Progress:
 | 3. Runnable docstrings | PASS | All four public docstrings, README and GUIDE examples executed. |
 | 4. Strict typing | PASS | `mypy --strict src tests`; installed-wheel typing consumer; `py.typed` shipped; error results' `Any` documented. |
 | 5. Errors | PASS | Typed validation errors; aggregate messages omit task text and results, bound type names and huge indices. Original caller errors remain accessible. |
-| 6. Full contracts | PASS | 417 passing tests including source, options, ordering, progress, cancellation, pickles and installed consumers. |
+| 6. Full contracts | PASS | 486 passing tests including source, options, ordering, progress, cancellation, pickles, class hooks and installed consumers. |
 | 7. Ground truth | PASS | Hash-pinned Python reference examples extracted and executed; live builtin and executor comparisons. |
 | 8. Real e2e | PASS | Wheel installed in a fresh venv; isolated subprocess consumer; actual 0.2.0 upgrade and bidirectional pickles. No CLI exists. |
 | 9. Seeded properties | PASS | 160 seeded oracle cases plus 1,500 additional cases; 20k/80k scaling in all four scheduling modes. |
@@ -34,9 +35,9 @@ Progress:
 | 13. Metadata | PASS | 1.0.0, Production/Stable, Python >=3.10, 3.10-3.14 classifiers, MIT, project URLs, keywords, no runtime dependencies. |
 | 14. Archives | PASS | Wheel and sdist inspected; LICENSE and typing marker included; no fetched documents, caches or working notes. |
 | 15. Gates | PASS | Format, lint, strict source typing and pytest exit 0; source and tests also pass strict typing together. |
-| 16. Independent reviewer | PENDING | Reserved for the next review stage. |
+| 16. Independent reviewer | PENDING | Round 1 findings CERT-05 and CERT-06 are fixed below; independent re-review remains pending. |
 | 17. Release | PREPARED | PR #3, branch `release/1.0.0`; merge and publication pending. |
-| 18. Mutation round | PASS | Original 23/23 variants caught; all seven round 1 survivors, round 2 N21 and round 3 M05 now caught by added contracts. |
+| 18. Mutation round | PASS | Original 23/23 variants caught; all seven round 1 survivors, round 2 N21, round 3 M05 and six independent-review regression mutations caught. |
 | 19. QA lenses | PENDING | e reported FAIL in round 3; E-09 fixed below, awaiting independent re-review. Earlier lens verdicts are unchanged. |
 
 ## API and compatibility
@@ -273,3 +274,62 @@ directory's `qa-fix-r3/` folder. `logs/` retains `M05-results.json`, the exact p
 original/mutant/restored console logs and JUnit files, and the release gate results.
 All Python source files remain at most 200 lines. The initial interpreter matrix above
 predates this round; no new cross-version matrix result is claimed here.
+
+## QA independent review, round 1
+
+Review target: `53f7b2b0853fbf26498589fb726e79dc1fd10772`, on 2026-11-01.
+Implementation commit: this commit
+(`fix runtime type validation and fatal exception handling`).
+The independent reviewer reported two medium findings, CERT-05 and CERT-06.
+Both are addressed; independent re-review remains pending. No finding is disputed.
+
+| Finding | Change and regression evidence |
+| --- | --- |
+| CERT-05 | Reject bool counts by exact type, retain index conversion, and validate prefixes, mappings and failure values by actual type inheritance. Registered mappings remain accepted. The scheduler classifies failures by actual exception inheritance, preserving fatal exception identity and precedence over ordered ordinary failures. Public signatures and defaults are unchanged; all behavior changes are in CHANGELOG. |
+| CERT-06 | Add 69 public regression cases in `test_validation_hooks.py` and `test_fatal_hooks.py`: both APIs and count options, valid integer/index-convertible counts, invalid options before input access, both aggregate mappings, invalid failure values, registered mappings, and fatal exception subclasses in both ordering and collection modes. They assert exact validation errors, no class-property access, and original fatal exception identity. |
+
+Before production edits, all **69 new contracts failed** on the reviewed code.
+The independent reviewer's original reproduction separately produced **17 failures**.
+After the fix, all **69 contracts and 17 reviewer checks pass**.
+
+Six separate mutations restore each defective boundary in a scratch source copy.
+Every mutation exits 1 with actual test failures and no collection or setup errors.
+The original and byte-for-byte restored copies each pass all 69 focused contracts.
+
+| Mutation | Reintroduced defect | Failing contract |
+| --- | --- | --- |
+| M01 | Instance-based bool rejection | `test_valid_counts_ignore_class_hooks` |
+| M02 | Instance-based prefix validation | `test_invalid_options_ignore_class_hooks_before_reading_input` |
+| M03 | Instance-based Mapping validation | `test_invalid_aggregate_arguments_ignore_class_hooks`, `test_registered_mappings_ignore_class_hooks` |
+| M04 | Instance-based aggregate failure validation | `test_invalid_aggregate_arguments_ignore_class_hooks`, `test_constructor_rejects_fatal_exception_despite_class_hook` |
+| M05 | Instance-based classification for error collection | `test_fatal_class_hooks_cannot_change_propagation` |
+| M06 | Instance-based classification for ordered failures | `test_fatal_class_hooks_cannot_change_propagation`, `test_ordered_fatal_exception_preempts_an_earlier_failure` |
+
+Validation on CPython 3.14.6: `ruff format --check .`, `ruff check .`,
+`mypy --strict src`, `mypy --strict src tests`, and pytest all exit 0.
+With freshly fetched, hash-verified references, `THREADFAN_E2E=1` and
+`THREADFAN_E2E_PYPI=1`, the complete suite reports **486 passed, no skips**,
+including wheel installation, archive checks and real 0.2.0 upgrade/pickle checks.
+Each pytest case has a 300-second timeout. All Python source files remain at most
+200 lines. Evidence is retained in the certification scratch directory's
+`review-fix-r1/` folder: `logs/red-contracts.*`, `logs/red-reviewer.*`,
+`logs/green-contracts.*`, `logs/green-reviewer.*`, `logs/final-*`,
+`logs/M01.*` through `logs/M06.*` and `mutations/results.json`.
+
+The installed wheel separately passes all **86 focused checks** (69 new contracts
+and the reviewer's 17 cases), with its site-packages import path asserted before
+collection. See `logs/installed-contracts.*`.
+
+| Runtime | Passed | Skipped |
+| --- | ---: | ---: |
+| CPython 3.10.22 | 484 | 2 |
+| CPython 3.11.18 | 485 | 1 |
+| CPython 3.12.16 | 485 | 1 |
+| CPython 3.13.18 | 485 | 1 |
+| CPython 3.14.6 | 486 | 0 |
+| CPython 3.14.10 | 485 | 1 |
+| CPython 3.14.10 free-threaded, GIL disabled | 485 | 1 |
+
+The matrix skips only the separately executed wheel test; Python 3.10 also skips
+the unavailable `add_note` feature. `logs/matrix-results.json` and the per-runtime
+logs and JUnit files record the new runs. No supported Python minor remains untested.
