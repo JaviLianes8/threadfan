@@ -8,6 +8,7 @@ Progress:
 - [x] README, guide, changelog, metadata and archive inspection (items 11-14).
 - [x] Four gates and 23 deliberate mutations (items 15 and 18).
 - [x] Release PR [#3](https://github.com/JaviLianes8/threadfan/pull/3) prepared.
+- [x] QA round 1 fixes for C-01, C-02 and E-01 through E-07, with regression evidence.
 - [ ] Independent reviewer (item 16).
 - [ ] Merge and publication (item 17).
 - [ ] Five independent QA lenses (item 19).
@@ -21,7 +22,7 @@ Progress:
 | 3. Runnable docstrings | PASS | All four public docstrings, README and GUIDE examples executed. |
 | 4. Strict typing | PASS | `mypy --strict src tests`; installed-wheel typing consumer; `py.typed` shipped; error results' `Any` documented. |
 | 5. Errors | PASS | Typed validation errors; aggregate messages omit task text and results, bound type names and huge indices. Original caller errors remain accessible. |
-| 6. Full contracts | PASS | 329 passing tests including source, options, ordering, progress, cancellation, pickles and installed consumers. |
+| 6. Full contracts | PASS | 408 passing tests including source, options, ordering, progress, cancellation, pickles and installed consumers. |
 | 7. Ground truth | PASS | Hash-pinned Python reference examples extracted and executed; live builtin and executor comparisons. |
 | 8. Real e2e | PASS | Wheel installed in a fresh venv; isolated subprocess consumer; actual 0.2.0 upgrade and bidirectional pickles. No CLI exists. |
 | 9. Seeded properties | PASS | 160 seeded oracle cases plus 1,500 additional cases; 20k/80k scaling in all four scheduling modes. |
@@ -33,15 +34,16 @@ Progress:
 | 15. Gates | PASS | Format, lint, strict source typing and pytest exit 0; source and tests also pass strict typing together. |
 | 16. Independent reviewer | PENDING | Reserved for the next review stage. |
 | 17. Release | PREPARED | PR #3, branch `release/1.0.0`; merge and publication pending. |
-| 18. Mutation round | PASS | 23/23 deliberately broken variants fail the contract/doctest suite; no survivor. |
-| 19. QA lenses | PENDING | a, b, c, d and e have no recorded verdicts. |
+| 18. Mutation round | PASS | Original 23/23 variants caught; all seven additional round 1 survivors now caught by added contracts. |
+| 19. QA lenses | PENDING | c and e reported FAIL in round 1; all nine findings fixed below, awaiting independent re-review. No a, b or d verdict is recorded here. |
 
 ## API and compatibility
 
 Resumed at `4ff515a` on 2026-11-01 with no certification report or saved lens verdicts.
 Baseline: 288 passed, one opt-in wheel skip, one missing-changelog failure. The existing
-commit is preserved. Runtime code validated below is at `54dfbdf`; later changes add
-explicit installed-version assertions and this report.
+commit is preserved. Initial runtime validation below used `54dfbdf`; later changes add
+explicit installed-version assertions and this report. QA round 1 changes are recorded
+in the final section.
 
 The stable exports are `thread_map`, `thread_imap`, `ThreadMapError` and
 `ProgressCallback`. Count annotations now match integer-like inputs (`SupportsIndex`).
@@ -101,12 +103,12 @@ There is no CLI, `__main__` or console entry point.
 The wheel has 11 entries: package modules, `py.typed`, metadata and LICENSE. The sdist
 has 37 entries: source, tests, manifest, docs, development scripts and metadata. No
 fetched reference text, caches, venvs or certification notes are shipped.
-Final wheel SHA-256: `2d88ee94fb4effa91057499fb50d09675df3e6bf54bd3aa0e1967acf73a5cbd7`.
-Final sdist SHA-256: `a8b8c2da212781914271a26cc73e95d3c611fbe465d5881c787a809c2a04abf6`.
+Initial wheel SHA-256: `2d88ee94fb4effa91057499fb50d09675df3e6bf54bd3aa0e1967acf73a5cbd7`.
+Initial sdist SHA-256: `a8b8c2da212781914271a26cc73e95d3c611fbe465d5881c787a809c2a04abf6`.
 
 The installed-wheel suite was taken from an extracted sdist with its `src` directory
 removed and pytest's source path disabled. Every import resolves under `site-packages`.
-The final wheel is byte-identical to the wheel used throughout this matrix:
+The initial wheel is byte-identical to the wheel used throughout this matrix:
 
 | CPython | Passed | Skipped |
 | --- | --- | --- |
@@ -157,7 +159,7 @@ test, and the source is restored before the next variant. All 23 are killed.
 | 22 | Ignore the worker-name prefix | `tests/test_options.py::test_worker_threads_carry_the_prefix_as_the_standard_library_names_them` |
 | 23 | Reverse completed callback batches | `tests/test_scheduling_contract.py::test_unordered_batches_keep_callback_order[False-False]` |
 
-## Final gates and remaining stages
+## Initial gates and remaining stages
 
 On 2026-11-01: `ruff format --check .`, `ruff check .`, `mypy --strict src`,
 `mypy --strict src tests`, and pytest with `THREADFAN_UPSTREAM`, `THREADFAN_E2E=1`
@@ -166,3 +168,41 @@ All Python source files are at most 200 lines. The README badge matches the refe
 
 Items 1-15 and 18 are complete. Independent review and lenses a-e remain pending;
 no verdict is carried forward. PR #3 is open; merge and publication remain pending.
+
+## QA lenses, round 1
+
+Review target: `b7d3cfecdf9e54c1832458df4ac6d9e78d46ecdc`, on 2026-11-01.
+Implementation commit: `fix aggregate formatting and close QA contract gaps`.
+Lens c reported two medium behavior defects; lens e reported seven medium contract
+gaps. All nine findings are addressed. Independent lens re-review remains pending.
+
+| Finding | Change and regression evidence |
+| --- | --- |
+| C-01 | Normalize accepted integer subclasses to built-in ints in both mappings before sorting and formatting. `test_error_indices.py` covers hostile conversion/comparison hooks, reversed comparisons, and oversized bit-length output for positive and negative indices. |
+| C-02 | Read names through the built-in type descriptor, convert to plain str, then enforce the existing bound. `test_error_type_names.py` covers metaclass lookup and properties, string hooks, long names, collection through both APIs, and invalid options. |
+| E-01 / M29 | `test_progress_return_values_do_not_stop_results` checks False, 0, None, empty text and a truthy object in both ordering modes; all values and progress calls survive. Mutation caught. |
+| E-02 / M42 | `test_observed_failure_cancels_tail_before_consumer_resumes` uses real workers and event gates to prove queued futures are cancelled while the ordered consumer is suspended. Mutation caught. |
+| E-03 / M52 | `test_installed_wheel_end_to_end` exchanges actual 0.2.0 and 1.0.0 pickles for subclasses slotting results and both mappings, for protocols 0-5. Each producing version also reloads its output. Mutation caught at the old-to-new results assertion. |
+| E-04 / M55 | `test_map_captures_context_before_materializing_the_source` mutates the source's ContextVar, checks tasks retain the call-time value and the caller retains the source's change. Mutation caught. |
+| E-05 / M59 | `test_sorted_dictionary_inputs_are_independent_copies` mutates sorted ordinary input dictionaries and exposed mappings independently, for errors and results. Mutation caught. |
+| E-06 / M60 | `test_negative_indices_sort_with_zero_and_positive_indices` checks negative, zero and positive indices in both mappings. Mutation caught. |
+| E-07 / M61 | `test_boolean_indices_are_rejected_in_both_mappings` rejects False and True in errors and results. Mutation caught. |
+
+Before production changes, the added index/type-name contracts produced **58 failures
+and 8 passes** on the reviewed code. After correction, all **66 pass**. The five original
+lens c subclass reproductions also pass. Each of the seven lens e mutations was applied
+separately in a scratch copy; each produced a test failure (exit 1), with no collection
+or environment errors. The unchanged runtime behavior behind E-01 through E-07 needed
+additional contracts only. Both behavior changes are recorded in CHANGELOG and the
+integer normalization is documented in the guide and public error docstring.
+
+Validation on CPython 3.14.6: `ruff format --check .`, `ruff check .`,
+`mypy --strict src`, `mypy --strict src tests`, and the complete pytest suite exit 0.
+With `THREADFAN_UPSTREAM`, `THREADFAN_E2E=1` and `THREADFAN_E2E_PYPI=1`, the result is
+**408 passed, no skips**, including installed-wheel, archive, typing and real-version
+upgrade checks. Every pytest case has a 300-second timeout and all temporary artifacts
+are under the dedicated certification scratch directory's `qa-fix-r1/` folder.
+That directory retains `red.xml`, `green.xml`, `reviewer-repros.xml`, `full.xml`, and
+`mutation-results.json` with the individual mutation logs and JUnit files.
+All Python source files remain at most 200 lines. The initial interpreter matrix above
+predates this round; no new cross-version matrix result is claimed here.

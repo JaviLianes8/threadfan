@@ -65,18 +65,37 @@ assert thread_map(lambda _: var.get(), range(2), copy_context=True) == ["set", "
 print("e2e ok")
 """
 
+PICKLE_TYPES = """
+from threadfan import ThreadMapError
+
+class SlottedResults(ThreadMapError):
+    __slots__ = ("results",)
+
+class SlottedMappings(ThreadMapError):
+    __slots__ = ("errors", "results")
+"""
+
 PICKLE_PROGRAM = """
 import pathlib, pickle, sys
 from threadfan import ThreadMapError, thread_imap, thread_map
 folder = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(folder))
+from pickle_types import SlottedResults, SlottedMappings
 mode = sys.argv[2]
-for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
-    path = folder / f"error-{protocol}.pickle"
-    if mode == "write":
-        data = (ThreadMapError({1: ValueError("bad")}, {0: "ok"}), thread_map, thread_imap)
-        path.write_bytes(pickle.dumps(data, protocol))
-    else:
+for cls in (ThreadMapError, SlottedResults, SlottedMappings):
+    for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
+        path = folder / f"{cls.__name__}-{protocol}.pickle"
+        if mode == "write":
+            original = cls({1: ValueError("bad")}, {0: "ok"})
+            original.label = "batch"
+            if cls is not ThreadMapError:
+                assert "results" not in original.__dict__
+            if cls is SlottedMappings:
+                assert "errors" not in original.__dict__
+            data = (original, thread_map, thread_imap)
+            path.write_bytes(pickle.dumps(data, protocol))
         error, mapped, streamed = pickle.loads(path.read_bytes())
+        assert type(error) is cls and error.label == "batch"
         assert error.results == {0: "ok"} and list(error.errors) == [1]
         assert error.errors[1].args == ("bad",)
         assert mapped is thread_map and streamed is thread_imap
@@ -139,6 +158,7 @@ def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
         assert installed.returncode == 0, installed.stderr
         old = _consumer(python, work, "0.2.0")
         assert old.returncode == 0, old.stderr
+        (work / "pickle_types.py").write_text(PICKLE_TYPES, encoding="utf-8")
         saved = _run(python, "-I", "-c", PICKLE_PROGRAM, work, "write", cwd=work)
         assert saved.returncode == 0, saved.stderr
         installed = _run(python, "-m", "pip", "install", "--no-deps", "--upgrade", wheel)

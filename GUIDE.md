@@ -91,6 +91,7 @@ the generator rules turn it into `RuntimeError` in `thread_imap` when stopping.
 
 `ThreadMapError(errors, results=None)` copies mappings sorted by integer index.
 Keys must be ints other than bool; error values must be `Exception` instances.
+Integer subclasses are stored as built-in ints, with ordinary numeric ordering.
 Manual construction allows empty mappings and any integer index. `errors` and
 `results` are mutable dictionaries. Collected stream errors have empty `results`
 because successes have already been yielded. The lowest task failure is the chained

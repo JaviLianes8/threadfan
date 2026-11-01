@@ -133,3 +133,19 @@ def test_each_flag_is_evaluated_once(flag: str) -> None:
     options: dict[str, Any] = {flag: value}
     assert thread_map(abs, [1, 2], **options) == [1, 2]
     assert value.calls == 1
+
+
+@pytest.mark.parametrize("returned", [False, 0, None, "", object()])
+@pytest.mark.parametrize("ordered", [False, True])
+def test_progress_return_values_do_not_stop_results(returned: object, ordered: bool) -> None:
+    seen: list[tuple[int, int]] = []
+
+    def report(done: int, total: int) -> object:
+        seen.append((done, total))
+        return returned
+
+    result = thread_map(
+        str, range(4), workers=1, max_pending=1, ordered=ordered, on_progress=report
+    )
+    assert result == ["0", "1", "2", "3"]
+    assert seen == [(1, 4), (2, 4), (3, 4), (4, 4)]

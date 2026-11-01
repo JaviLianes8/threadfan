@@ -25,6 +25,7 @@ class ThreadMapError(Exception):
     The message gives the number of failures, first index and exception type, without
     formatting task messages or results. The original exceptions and cause still hold
     the caller's data; handle those explicitly before logging a full traceback.
+    Integer subclasses are stored as built-in ints.
     Building one by hand takes any mapping from ``int`` indices
     to exceptions (and to results); anything else raises ``TypeError``. It pickles,
     subclasses and their attributes included, when its contents pickle.
@@ -64,12 +65,13 @@ class ThreadMapError(Exception):
 def _by_index(name: str, mapping: object, *, failures: bool) -> dict[int, Any]:
     if not isinstance(mapping, Mapping):
         raise TypeError(f"{name} must be a mapping, got {type_name(mapping)}")
-    pairs = list(mapping.items())
-    for index, value in pairs:
+    pairs = []
+    for index, value in mapping.items():
         if isinstance(index, bool) or not isinstance(index, int):
             raise TypeError(f"{name} keys must be int indices, got {type_name(index)}")
         if failures and not isinstance(value, Exception):
             raise TypeError(f"{name} values must be exceptions, got {type_name(value)}")
+        pairs.append((int.__int__(index), value))
     return dict(sorted(pairs, key=lambda pair: pair[0]))
 
 

@@ -32,6 +32,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Normalize aggregate index subclasses to built-in integers before storing, sorting
+  or describing them, preserving numeric order without invoking subclass hooks.
+- Read bounded type names without invoking metaclass or string-subclass hooks, so
+  validation and aggregation retain their documented errors and message limits.
 - Unordered mode preserves completion callback arrival order within each batch
   instead of reordering that batch by input index. Simultaneous completions can tie.
 - Cancel queued higher-index tasks as soon as an ordered task failure is observed.

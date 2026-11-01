@@ -12,6 +12,7 @@ Progress:
 - [x] Gates: ruff format, ruff check, mypy --strict, pytest
 - [x] Independent review findings fixed with regression tests
 - [x] Pull request opened (#2), guard clean
+- [x] 1.0.0 QA round 1: bounded subclass descriptions and seven missing contracts
 
 Every item is additive. `thread_map` keeps its name, its positional `fn` and `items`,
 every keyword it had, and its `list[R]` return type.

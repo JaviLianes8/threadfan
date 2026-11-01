@@ -14,12 +14,14 @@ _SMALL = 10**15
 
 def type_name(value: object) -> str:
     """The name of ``value``'s type, cut so that a huge class name stays out of messages."""
-    name = type(value).__name__
+    # Bypass metaclass lookup and string hooks before bounding or formatting the name.
+    name = str.__str__(type.__dict__["__name__"].__get__(type(value)))
     return name if len(name) <= _NAME_LIMIT else name[: _NAME_LIMIT - 3] + "..."
 
 
 def show_int(value: int) -> str:
     """``value`` in decimal, or its size when the digits would flood a message."""
+    value = int.__int__(value)
     if -_SMALL < value < _SMALL:
         return int.__repr__(value)
     return f"an integer of {value.bit_length()} bits"
