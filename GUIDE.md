@@ -41,6 +41,8 @@ order. `thread_imap` obtains the iterator at call time but reads no item until
 sources. Ordered streaming can wait for a slow first item while later results wait.
 Unordered results follow completion callbacks; simultaneous completions and tasks
 already complete when their callbacks are attached have no promised relative order.
+The window bounds pending work, not stored failures: collecting errors uses memory
+proportional to the number of failures. Use a finite source when collecting them.
 
 Close a partially consumed stream with `contextlib.closing`. A bare `break` does not
 close a generator that you still reference. Closing cancels queued tasks and waits

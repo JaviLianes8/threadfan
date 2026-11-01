@@ -108,6 +108,8 @@ with closing(thread_imap(fetch, pages, workers=4)) as stream:
 At most `max_pending` items (default twice `workers`) are submitted and not yet
 yielded at any time. An ordered stream waits for its oldest item before yielding
 later ones; pass `ordered=False` to get results as they complete.
+Collected failures with `stop_on_error=False` remain in memory until the run ends;
+that mode needs a finite source when failures can occur.
 
 Errors in an ordered stream behave like the builtin `map`: every result before
 the lowest failing index is yielded, then that failure is raised. If the source

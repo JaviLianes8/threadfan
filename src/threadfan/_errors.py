@@ -10,6 +10,7 @@ from ._options import show_int, type_name
 
 # The constructor that pickle protocol 2 and later name NEWOBJ; typeshed does not declare it.
 _NEWOBJ: Callable[..., object] = vars(copyreg)["__newobj__"]
+_SLOTNAMES: Callable[[type[object]], list[str]] = vars(copyreg)["_slotnames"]
 
 
 class ThreadMapError(Exception):
@@ -53,7 +54,11 @@ class ThreadMapError(Exception):
         # Rebuild without calling ``__init__`` (a subclass may take other arguments) and
         # restore the state (notes, extra attributes) afterwards. The pickle names only
         # ``copyreg`` and the class, never the private module that defines it.
-        return (_NEWOBJ, (type(self), *self.args), self.__dict__)
+        slots = {
+            name: getattr(self, name) for name in _SLOTNAMES(type(self)) if hasattr(self, name)
+        }
+        state = {**self.__dict__, **slots}
+        return (_NEWOBJ, (type(self), *self.args), state)
 
 
 def _by_index(name: str, mapping: object, *, failures: bool) -> dict[int, Any]:

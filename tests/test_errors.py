@@ -140,3 +140,23 @@ def test_notes_survive_pickling() -> None:
     error.add_note("batch 7")  # type: ignore[attr-defined,unused-ignore]
     clone = pickle.loads(pickle.dumps(error))
     assert clone.__notes__ == ["batch 7"]
+
+
+class SlottedError(ThreadMapError):
+    __slots__ = ("label",)
+
+    def __init__(self, label: str) -> None:
+        super().__init__({1: ValueError("bad")}, {0: "ok"})
+        self.label = label
+
+
+@pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
+def test_subclass_slot_attributes_survive_pickling(protocol: int) -> None:
+    error = SlottedError("batch")
+    clone = pickle.loads(pickle.dumps(error, protocol))
+    assert type(clone) is SlottedError
+    assert clone.label == "batch"
+    assert clone.results == {0: "ok"}
+    assert clone.errors[1].args == ("bad",)
+    assert copy.copy(error).label == "batch"
+    assert copy.deepcopy(error).label == "batch"

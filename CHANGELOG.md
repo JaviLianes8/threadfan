@@ -37,6 +37,7 @@ All notable changes to this project are documented here. The format follows
 - Cancel queued higher-index tasks as soon as an ordered task failure is observed.
 - Drain a completion queue instead of rescanning all pending futures on each wakeup.
 - Explicitly close the inner scheduler when a stream is closed.
+- Preserve slotted subclass attributes when copying or pickling aggregate errors.
 
 ### Documentation and packaging
 

@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable, Iterator
+from concurrent.futures import Future, ThreadPoolExecutor
+from typing import ParamSpec, TypeVar
 
 import pytest
 
+import threadfan._engine
 from threadfan import thread_map
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 class Recorder:
@@ -82,19 +88,39 @@ def test_the_pool_threads_are_gone_after_any_exit() -> None:
         assert [t for t in threading.enumerate() if t.name.startswith("gone-a")] == []
 
 
-def test_items_already_queued_inside_the_window_are_cancelled() -> None:
-    started = threading.Event()
+def test_items_already_queued_inside_the_window_are_cancelled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submitted = threading.Event()
+    release = threading.Event()
     calls: list[int] = []
+
+    class Pool(ThreadPoolExecutor):
+        count = 0
+
+        def submit(self, fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> Future[R]:
+            future = super().submit(fn, *args, **kwargs)
+            self.count += 1
+            if self.count == 10:
+                submitted.set()
+            return future
+
+        def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+            super().shutdown(wait=False, cancel_futures=cancel_futures)
+            release.set()
+            super().shutdown(wait=wait)
 
     def work(value: int) -> int:
         calls.append(value)
         if value == 0:
-            started.set()
+            assert submitted.wait(5)
             raise RuntimeError("first")
+        assert release.wait(5)
         return value
 
+    monkeypatch.setattr(threadfan._engine, "ThreadPoolExecutor", Pool)
     with pytest.raises(RuntimeError, match="first"):
         thread_map(work, range(10), workers=1, max_pending=10)
-    assert started.is_set()
-    # The single worker may pick up one more item before the caller wakes up.
+    assert submitted.is_set()
+    assert calls[0] == 0
     assert len(calls) <= 2
