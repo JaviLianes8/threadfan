@@ -10,6 +10,7 @@ Progress:
 - [x] Release PR [#3](https://github.com/JaviLianes8/threadfan/pull/3) prepared.
 - [x] QA round 1 fixes for C-01, C-02 and E-01 through E-07, with regression evidence.
 - [x] QA round 2 fixes for C-03 and E-08, with regression and mutation evidence.
+- [x] QA round 3 fix for E-09, with regression and mutation evidence.
 - [ ] Independent reviewer (item 16).
 - [ ] Merge and publication (item 17).
 - [ ] Five independent QA lenses (item 19).
@@ -23,7 +24,7 @@ Progress:
 | 3. Runnable docstrings | PASS | All four public docstrings, README and GUIDE examples executed. |
 | 4. Strict typing | PASS | `mypy --strict src tests`; installed-wheel typing consumer; `py.typed` shipped; error results' `Any` documented. |
 | 5. Errors | PASS | Typed validation errors; aggregate messages omit task text and results, bound type names and huge indices. Original caller errors remain accessible. |
-| 6. Full contracts | PASS | 415 passing tests including source, options, ordering, progress, cancellation, pickles and installed consumers. |
+| 6. Full contracts | PASS | 417 passing tests including source, options, ordering, progress, cancellation, pickles and installed consumers. |
 | 7. Ground truth | PASS | Hash-pinned Python reference examples extracted and executed; live builtin and executor comparisons. |
 | 8. Real e2e | PASS | Wheel installed in a fresh venv; isolated subprocess consumer; actual 0.2.0 upgrade and bidirectional pickles. No CLI exists. |
 | 9. Seeded properties | PASS | 160 seeded oracle cases plus 1,500 additional cases; 20k/80k scaling in all four scheduling modes. |
@@ -35,8 +36,8 @@ Progress:
 | 15. Gates | PASS | Format, lint, strict source typing and pytest exit 0; source and tests also pass strict typing together. |
 | 16. Independent reviewer | PENDING | Reserved for the next review stage. |
 | 17. Release | PREPARED | PR #3, branch `release/1.0.0`; merge and publication pending. |
-| 18. Mutation round | PASS | Original 23/23 variants caught; all seven round 1 survivors and round 2 N21 now caught by added contracts. |
-| 19. QA lenses | PENDING | c and e reported FAIL in round 2; C-03 and E-08 fixed below, awaiting independent re-review. No a, b or d verdict is recorded here. |
+| 18. Mutation round | PASS | Original 23/23 variants caught; all seven round 1 survivors, round 2 N21 and round 3 M05 now caught by added contracts. |
+| 19. QA lenses | PENDING | e reported FAIL in round 3; E-09 fixed below, awaiting independent re-review. Earlier lens verdicts are unchanged. |
 
 ## API and compatibility
 
@@ -44,7 +45,7 @@ Resumed at `4ff515a` on 2026-11-01 with no certification report or saved lens ve
 Baseline: 288 passed, one opt-in wheel skip, one missing-changelog failure. The existing
 commit is preserved. Initial runtime validation below used `54dfbdf`; later changes add
 explicit installed-version assertions and this report. QA changes are recorded
-in the round 1 and round 2 sections below.
+in the round 1 through round 3 sections below.
 
 The stable exports are `thread_map`, `thread_imap`, `ThreadMapError` and
 `ProgressCallback`. Count annotations now match integer-like inputs (`SupportsIndex`).
@@ -238,5 +239,37 @@ archive, typing and real-version upgrade checks. Every pytest case has a 300-sec
 timeout. New temporary artifacts and evidence are under the certification scratch
 directory's `qa-fix-r2/` folder: `red.xml`, `green.xml`, `full.xml`, `N21-results.json`
 and the corresponding console logs and mutation JUnit files.
+All Python source files remain at most 200 lines. The initial interpreter matrix above
+predates this round; no new cross-version matrix result is claimed here.
+
+## QA lenses, round 3
+
+Review target: `9c55f7fae2bc00cd61181a3a265bade5a8fca6d9`, on 2026-11-01.
+Implementation commit: `28fd01e5e6164d37e4cd1de476c23724dd5f19b1`
+(`test invalid aggregate key class hooks`).
+Lens e reported one medium contract gap, E-09. It is addressed below;
+independent lens re-review remains pending.
+
+| Finding | Change and regression evidence |
+| --- | --- |
+| E-09 / M05 | `test_invalid_index_class_property_cannot_replace_type_error` supplies a non-integer key with a raising `__class__` property to each mapping. Both cases assert `TypeError`, the exact message naming the actual key type, and zero property calls. Both fail under M05. |
+
+The current runtime already satisfies this contract. The change adds two regression
+cases and records the coverage in CHANGELOG; runtime behavior and public APIs are unchanged.
+All **22 index tests pass** on the original code. In a scratch source copy, M05 replaces
+`issubclass(index_type, int)` with `isinstance(index, int)` in `_errors._by_index`.
+The result is **2 failures and 20 passes** (exit 1): both new cases raise the hook's
+RuntimeError. After byte-for-byte restoration, all **22 pass** again. The scratch runs
+assert the imported source path before collection; no setup or collection error is
+counted as a mutation failure.
+
+Validation on CPython 3.14.6: `ruff format --check .`, `ruff check .`,
+`mypy --strict src`, `mypy --strict src tests`, and the complete pytest suite exit 0.
+With freshly fetched, hash-verified references, `THREADFAN_E2E=1` and
+`THREADFAN_E2E_PYPI=1`, the result is **417 passed, no skips**, including installed-wheel,
+archive, typing and real-version upgrade checks. Every pytest case has a 300-second
+timeout. Temporary artifacts and evidence are under the certification scratch
+directory's `qa-fix-r3/` folder. `logs/` retains `M05-results.json`, the exact patch,
+original/mutant/restored console logs and JUnit files, and the release gate results.
 All Python source files remain at most 200 lines. The initial interpreter matrix above
 predates this round; no new cross-version matrix result is claimed here.
