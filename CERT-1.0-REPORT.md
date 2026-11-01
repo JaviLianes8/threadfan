@@ -172,7 +172,8 @@ no verdict is carried forward. PR #3 is open; merge and publication remain pendi
 ## QA lenses, round 1
 
 Review target: `b7d3cfecdf9e54c1832458df4ac6d9e78d46ecdc`, on 2026-11-01.
-Implementation commit: `fix aggregate formatting and close QA contract gaps`.
+Implementation commit: `125136bd6fe2989f4ecb580b480867e0dc117624`
+(`fix aggregate formatting and close QA contract gaps`).
 Lens c reported two medium behavior defects; lens e reported seven medium contract
 gaps. All nine findings are addressed. Independent lens re-review remains pending.
 
@@ -202,7 +203,7 @@ With `THREADFAN_UPSTREAM`, `THREADFAN_E2E=1` and `THREADFAN_E2E_PYPI=1`, the res
 **408 passed, no skips**, including installed-wheel, archive, typing and real-version
 upgrade checks. Every pytest case has a 300-second timeout and all temporary artifacts
 are under the dedicated certification scratch directory's `qa-fix-r1/` folder.
-That directory retains `red.xml`, `green.xml`, `reviewer-repros.xml`, `full.xml`, and
+That directory retains `red.xml`, `green.xml`, `reviewer-repros.xml`, `final.xml`, and
 `mutation-results.json` with the individual mutation logs and JUnit files.
 All Python source files remain at most 200 lines. The initial interpreter matrix above
 predates this round; no new cross-version matrix result is claimed here.
