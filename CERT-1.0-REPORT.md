@@ -278,7 +278,7 @@ predates this round; no new cross-version matrix result is claimed here.
 ## QA independent review, round 1
 
 Review target: `53f7b2b0853fbf26498589fb726e79dc1fd10772`, on 2026-11-01.
-Implementation commit: this commit
+Implementation commit: `3db157c8c0addb2da19b7d7e4d336475c5ccf90b`
 (`fix runtime type validation and fatal exception handling`).
 The independent reviewer reported two medium findings, CERT-05 and CERT-06.
 Both are addressed; independent re-review remains pending. No finding is disputed.
