@@ -32,6 +32,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Validate aggregate keys by their actual types, so integer-subclass `__class__`
+  hooks cannot interrupt construction of either the errors or results mapping.
 - Normalize aggregate index subclasses to built-in integers before storing, sorting
   or describing them, preserving numeric order without invoking subclass hooks.
 - Read bounded type names without invoking metaclass or string-subclass hooks, so

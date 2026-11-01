@@ -67,7 +67,8 @@ def _by_index(name: str, mapping: object, *, failures: bool) -> dict[int, Any]:
         raise TypeError(f"{name} must be a mapping, got {type_name(mapping)}")
     pairs = []
     for index, value in mapping.items():
-        if isinstance(index, bool) or not isinstance(index, int):
+        index_type = type(index)
+        if index_type is bool or not issubclass(index_type, int):
             raise TypeError(f"{name} keys must be int indices, got {type_name(index)}")
         if failures and not isinstance(value, Exception):
             raise TypeError(f"{name} values must be exceptions, got {type_name(value)}")

@@ -9,6 +9,7 @@ Progress:
 - [x] Four gates and 23 deliberate mutations (items 15 and 18).
 - [x] Release PR [#3](https://github.com/JaviLianes8/threadfan/pull/3) prepared.
 - [x] QA round 1 fixes for C-01, C-02 and E-01 through E-07, with regression evidence.
+- [x] QA round 2 fixes for C-03 and E-08, with regression and mutation evidence.
 - [ ] Independent reviewer (item 16).
 - [ ] Merge and publication (item 17).
 - [ ] Five independent QA lenses (item 19).
@@ -22,7 +23,7 @@ Progress:
 | 3. Runnable docstrings | PASS | All four public docstrings, README and GUIDE examples executed. |
 | 4. Strict typing | PASS | `mypy --strict src tests`; installed-wheel typing consumer; `py.typed` shipped; error results' `Any` documented. |
 | 5. Errors | PASS | Typed validation errors; aggregate messages omit task text and results, bound type names and huge indices. Original caller errors remain accessible. |
-| 6. Full contracts | PASS | 408 passing tests including source, options, ordering, progress, cancellation, pickles and installed consumers. |
+| 6. Full contracts | PASS | 415 passing tests including source, options, ordering, progress, cancellation, pickles and installed consumers. |
 | 7. Ground truth | PASS | Hash-pinned Python reference examples extracted and executed; live builtin and executor comparisons. |
 | 8. Real e2e | PASS | Wheel installed in a fresh venv; isolated subprocess consumer; actual 0.2.0 upgrade and bidirectional pickles. No CLI exists. |
 | 9. Seeded properties | PASS | 160 seeded oracle cases plus 1,500 additional cases; 20k/80k scaling in all four scheduling modes. |
@@ -34,16 +35,16 @@ Progress:
 | 15. Gates | PASS | Format, lint, strict source typing and pytest exit 0; source and tests also pass strict typing together. |
 | 16. Independent reviewer | PENDING | Reserved for the next review stage. |
 | 17. Release | PREPARED | PR #3, branch `release/1.0.0`; merge and publication pending. |
-| 18. Mutation round | PASS | Original 23/23 variants caught; all seven additional round 1 survivors now caught by added contracts. |
-| 19. QA lenses | PENDING | c and e reported FAIL in round 1; all nine findings fixed below, awaiting independent re-review. No a, b or d verdict is recorded here. |
+| 18. Mutation round | PASS | Original 23/23 variants caught; all seven round 1 survivors and round 2 N21 now caught by added contracts. |
+| 19. QA lenses | PENDING | c and e reported FAIL in round 2; C-03 and E-08 fixed below, awaiting independent re-review. No a, b or d verdict is recorded here. |
 
 ## API and compatibility
 
 Resumed at `4ff515a` on 2026-11-01 with no certification report or saved lens verdicts.
 Baseline: 288 passed, one opt-in wheel skip, one missing-changelog failure. The existing
 commit is preserved. Initial runtime validation below used `54dfbdf`; later changes add
-explicit installed-version assertions and this report. QA round 1 changes are recorded
-in the final section.
+explicit installed-version assertions and this report. QA changes are recorded
+in the round 1 and round 2 sections below.
 
 The stable exports are `thread_map`, `thread_imap`, `ThreadMapError` and
 `ProgressCallback`. Count annotations now match integer-like inputs (`SupportsIndex`).
@@ -205,5 +206,36 @@ upgrade checks. Every pytest case has a 300-second timeout and all temporary art
 are under the dedicated certification scratch directory's `qa-fix-r1/` folder.
 That directory retains `red.xml`, `green.xml`, `reviewer-repros.xml`, `final.xml`, and
 `mutation-results.json` with the individual mutation logs and JUnit files.
+All Python source files remain at most 200 lines. The initial interpreter matrix above
+predates this round; no new cross-version matrix result is claimed here.
+
+## QA lenses, round 2
+
+Review target: `262fbb49b8e6ef2edca8a11a1f53ff7b3febca39`, on 2026-11-01.
+Implementation: `fix aggregate class lookup and strengthen error contracts`.
+Lens c reported one medium behavior defect; lens e reported one medium contract gap.
+Both findings are addressed. Independent lens re-review remains pending.
+
+| Finding | Change and regression evidence |
+| --- | --- |
+| C-03 | Validate keys using their actual type, reject bool, then normalize real integer subclasses with `int.__int__`. `test_integer_subclasses_use_builtin_order_and_storage[ClassLookupIndex-errors]` and its results case exercise a raising `__class__` hook, numeric sorting, built-in int storage and value identity. Bool and spoofed integer classes remain rejected in both mappings. |
+| E-08 / N21 | `test_aggregate_type_name_bypasses_instance_class_property` checks a raising exception `__class__` property through direct construction, `thread_map` and `thread_imap`. Each case preserves the original exception and exact actual type name; collected failures retain the cause. The existing runtime type-name lookup is unchanged. N21 is caught in all three cases. |
+
+Before the runtime fix, the focused contracts produced **2 failures and 71 passes**;
+both failures were the C-03 cases and raised the reported RuntimeError. After correction,
+all **73 pass**. N21 was applied only in a scratch source copy, replacing `type(value)`
+with `value.__class__` in `type_name`. The three new E-08 cases passed before mutation,
+failed with the intended RuntimeError under N21 (exit 1), and passed after byte-for-byte
+restoration. No collection or environment errors counted as mutation failures.
+The key-validation behavior change is recorded in CHANGELOG; public signatures are unchanged.
+
+Validation on CPython 3.14.6: `ruff format --check .`, `ruff check .`,
+`mypy --strict src`, `mypy --strict src tests`, and the complete pytest suite exit 0.
+With freshly fetched, hash-verified references, `THREADFAN_E2E=1` and
+`THREADFAN_E2E_PYPI=1`, the result is **415 passed, no skips**, including installed-wheel,
+archive, typing and real-version upgrade checks. Every pytest case has a 300-second
+timeout. New temporary artifacts and evidence are under the certification scratch
+directory's `qa-fix-r2/` folder: `red.xml`, `green.xml`, `full.xml`, `N21-results.json`
+and the corresponding console logs and mutation JUnit files.
 All Python source files remain at most 200 lines. The initial interpreter matrix above
 predates this round; no new cross-version matrix result is claimed here.

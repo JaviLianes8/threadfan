@@ -80,3 +80,27 @@ def test_invalid_options_keep_type_errors_without_type_name_hooks(
         call(**options)
     assert str(info.value).endswith(f", got {expected_name}")
     assert len(str(info.value)) < 120
+
+
+@pytest.mark.parametrize("entry_point", ["constructor", "map", "imap"])
+def test_aggregate_type_name_bypasses_instance_class_property(entry_point: str) -> None:
+    class TaskFailure(Exception):
+        @property  # type: ignore[misc]
+        def __class__(self) -> type[Exception]:  # type: ignore[override]
+            raise RuntimeError("instance class hook executed")
+
+    failure = TaskFailure("private task data")
+
+    def task(value: int) -> int:
+        raise failure
+
+    if entry_point == "constructor":
+        error = ThreadMapError({0: failure})
+    else:
+        call = thread_imap if entry_point == "imap" else thread_map
+        with pytest.raises(ThreadMapError) as info:
+            list(call(task, [0], stop_on_error=False))
+        error = info.value
+        assert error.__cause__ is failure
+    assert error.errors[0] is failure
+    assert str(error) == "1 task failed; first at index 0: TaskFailure"

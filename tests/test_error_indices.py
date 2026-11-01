@@ -33,8 +33,15 @@ class LeakingIndex(int):
         return "private-token-" * 10_000
 
 
+class ClassLookupIndex(int):
+    def __getattribute__(self, name: str) -> Any:
+        if name == "__class__":
+            raise RuntimeError("class lookup hook executed")
+        return super().__getattribute__(name)
+
+
 @pytest.mark.parametrize("mapping", ["errors", "results"])
-@pytest.mark.parametrize("index_type", [HostileIndex, ReverseIndex, LeakingIndex])
+@pytest.mark.parametrize("index_type", [HostileIndex, ReverseIndex, LeakingIndex, ClassLookupIndex])
 def test_integer_subclasses_use_builtin_order_and_storage(
     mapping: str, index_type: type[int]
 ) -> None:
@@ -83,6 +90,21 @@ def test_negative_indices_sort_with_zero_and_positive_indices(mapping: str) -> N
 def test_boolean_indices_are_rejected_in_both_mappings(mapping: str, index: bool) -> None:
     given: dict[int, Exception] = {index: ValueError()}
     with pytest.raises(TypeError, match=f"^{mapping} keys must be int indices, got bool$"):
+        if mapping == "errors":
+            ThreadMapError(given)
+        else:
+            ThreadMapError({}, given)
+
+
+@pytest.mark.parametrize("mapping", ["errors", "results"])
+def test_spoofed_integer_class_is_rejected_in_both_mappings(mapping: str) -> None:
+    class PretendIndex:
+        @property  # type: ignore[misc]
+        def __class__(self) -> type[int]:  # type: ignore[override]
+            return int
+
+    given: Any = {PretendIndex(): ValueError()}
+    with pytest.raises(TypeError):
         if mapping == "errors":
             ThreadMapError(given)
         else:
